@@ -23,7 +23,7 @@ Full-scale **R2Finance** web app — YNAB-grade multi-account register, inbox, c
 | **All transactions** | Cross-account search, month/account filters |
 | **Categories** | Groups + month activity |
 | **Payees** | Search + activity totals |
-| **Reports** | Month spend by category / payee / account + 6-month trend |
+| **Reports** | Month / year / all-time: inflow·outflow·net, by category / group / payee / account, % share bars, monthly + yearly income vs expense trends |
 | **More / sync** | Plan meta, stats, pull / push / tick / full import |
 | **Connectors** | BoA + Chase + Vanguard + Venmo via Plaid Link (per email; access only) |
 
