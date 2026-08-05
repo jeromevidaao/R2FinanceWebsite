@@ -651,10 +651,20 @@ select {
   display: grid;
   place-items: center;
   font-weight: 800;
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   background: linear-gradient(135deg, #012169, #e31837);
   color: #fff;
   flex-shrink: 0;
+  text-align: center;
+  line-height: 1.1;
+  padding: 4px;
+}
+.connector-logo.boa {
+  background: linear-gradient(135deg, #012169, #e31837);
+}
+.connector-logo.chase {
+  background: linear-gradient(135deg, #117aca, #0b4f8a);
+  font-size: 0.68rem;
 }
 .connector-head h2 {
   margin: 0 0 2px;

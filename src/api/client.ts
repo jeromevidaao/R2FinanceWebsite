@@ -128,8 +128,11 @@ export const ledgerApi = {
     post<unknown>('/v1/sync/import', { sinceDate }),
 };
 
-// ── Bank connectors (Plaid / BoA) ─────────────────────────────────────
-export type BoaStatus = {
+// ── Bank connectors (Plaid — BoA, Chase, …) ───────────────────────────
+export type ConnectorId = 'boa' | 'chase';
+
+export type ConnectorStatus = {
+  connectorId?: ConnectorId | string;
   provider: string;
   institution: string;
   institutionId?: string | null;
@@ -150,7 +153,10 @@ export type BoaStatus = {
   note?: string;
 };
 
-export type BoaAccount = {
+/** @deprecated use ConnectorStatus */
+export type BoaStatus = ConnectorStatus;
+
+export type ConnectorAccount = {
   accountId: string;
   name: string;
   officialName?: string | null;
@@ -165,42 +171,77 @@ export type BoaAccount = {
   };
 };
 
-export type BoaAccounts = {
+/** @deprecated use ConnectorAccount */
+export type BoaAccount = ConnectorAccount;
+
+export type ConnectorAccounts = {
   ok: boolean;
+  connectorId?: string;
   institutionName?: string;
   itemId?: string | null;
-  accounts: BoaAccount[];
+  accounts: ConnectorAccount[];
   importTransactionsToDdb: boolean;
   source?: string;
 };
 
+/** @deprecated use ConnectorAccounts */
+export type BoaAccounts = ConnectorAccounts;
+
+export type ConnectorExchangeResult = {
+  ok: boolean;
+  connected: boolean;
+  connectorId?: string;
+  itemId: string;
+  institutionName: string;
+  accounts: ConnectorAccount[];
+  importTransactionsToDdb: boolean;
+};
+
 export const connectorsApi = {
-  boaStatus: () => get<BoaStatus>('/v1/connectors/boa'),
-  boaLinkToken: () =>
-    getOrPostLinkToken(),
-  boaExchange: (publicToken: string, metadata?: unknown) =>
+  list: () =>
+    get<{ connectors: ConnectorStatus[] }>('/v1/connectors').then(
+      (r) => r.connectors,
+    ),
+  status: (bank: ConnectorId | string) =>
+    get<ConnectorStatus>(`/v1/connectors/${bank}`),
+  linkToken: (bank: ConnectorId | string) =>
     post<{
-      ok: boolean;
-      connected: boolean;
-      itemId: string;
-      institutionName: string;
-      accounts: BoaAccount[];
-      importTransactionsToDdb: boolean;
-    }>('/v1/connectors/boa/exchange', {
+      link_token: string;
+      expiration?: string;
+      institution?: string;
+      connectorId?: string;
+    }>(`/v1/connectors/${bank}/link-token`, {}),
+  exchange: (
+    bank: ConnectorId | string,
+    publicToken: string,
+    metadata?: unknown,
+  ) =>
+    post<ConnectorExchangeResult>(`/v1/connectors/${bank}/exchange`, {
       public_token: publicToken,
       metadata,
     }),
-  boaAccounts: () => get<BoaAccounts>('/v1/connectors/boa/accounts'),
+  accounts: (bank: ConnectorId | string) =>
+    get<ConnectorAccounts>(`/v1/connectors/${bank}/accounts`),
+  disconnect: (bank: ConnectorId | string) =>
+    post<{ ok: boolean; connected: boolean; connectorId?: string }>(
+      `/v1/connectors/${bank}/disconnect`,
+    ),
+
+  // BoA aliases (backward compatible)
+  boaStatus: () => get<ConnectorStatus>('/v1/connectors/boa'),
+  boaLinkToken: () =>
+    post<{ link_token: string; expiration?: string; institution?: string }>(
+      '/v1/connectors/boa/link-token',
+      {},
+    ),
+  boaExchange: (publicToken: string, metadata?: unknown) =>
+    post<ConnectorExchangeResult>('/v1/connectors/boa/exchange', {
+      public_token: publicToken,
+      metadata,
+    }),
+  boaAccounts: () => get<ConnectorAccounts>('/v1/connectors/boa/accounts'),
   boaDisconnect: () =>
     post<{ ok: boolean; connected: boolean }>(
       '/v1/connectors/boa/disconnect',
     ),
 };
-
-async function getOrPostLinkToken() {
-  return post<{
-    link_token: string;
-    expiration?: string;
-    institution?: string;
-  }>('/v1/connectors/boa/link-token', {});
-}
