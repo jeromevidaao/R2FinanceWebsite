@@ -81,13 +81,22 @@ export const authApi = {
   setPassword: (email: string, password: string) =>
     post<AuthLogin>('/v1/auth/set-password', { email, password }),
   login: (email: string, password: string) =>
-    post<AuthLogin>('/v1/auth/login', { email, password }),
+    post<AuthLogin>('/v1/auth/login', { email, password, client: 'web' }),
   mfaSetup: (email: string, password: string) =>
     post<MfaSetup>('/v1/auth/mfa/setup', { email, password }),
   mfaEnable: (email: string, password: string, code: string) =>
-    post<AuthLogin>('/v1/auth/mfa/enable', { email, password, code }),
+    post<AuthLogin>('/v1/auth/mfa/enable', {
+      email,
+      password,
+      code,
+      client: 'web',
+    }),
   mfaVerify: (mfaToken: string, code: string) =>
-    post<AuthLogin>('/v1/auth/mfa/verify', { mfaToken, code }),
+    post<AuthLogin>('/v1/auth/mfa/verify', {
+      mfaToken,
+      code,
+      client: 'web',
+    }),
   me: () => get<{ email: string; expiresAt: number }>('/v1/auth/me'),
   forgotPassword: (email: string) =>
     post<{ ok?: boolean; message?: string; error?: string; website?: string }>(
