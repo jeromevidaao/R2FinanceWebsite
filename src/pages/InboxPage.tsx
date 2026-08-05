@@ -16,7 +16,7 @@ export function InboxPage() {
 
   const items = useMemo(() => {
     if (!data) return [];
-    return data.transactions.filter(isInboxTxn);
+    return data.transactions.filter((t) => isInboxTxn(t, data));
   }, [data]);
 
   if (loading && !data) return <Loading />;
@@ -62,13 +62,15 @@ export function InboxPage() {
                 <div className={`mono ${moneyClass(t.amount)}`}>
                   {formatMoney(t.amount)}
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setTarget(t)}
-                >
-                  Categorize
-                </button>
+                {!t.transferAccountId && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setTarget(t)}
+                  >
+                    {t.categoryId ? 'Edit category' : 'Categorize'}
+                  </button>
+                )}
               </li>
             );
           })}

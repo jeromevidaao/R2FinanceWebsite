@@ -10,6 +10,7 @@ import { MorePage } from './pages/MorePage';
 import { PayeesPage } from './pages/PayeesPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { TransactionsPage } from './pages/TransactionsPage';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -21,6 +22,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
         path="/"
         element={

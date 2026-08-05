@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { clearSession, getEmail } from '../api/client';
 import { useLedger } from '../hooks/useLedger';
+import { isInboxTxn } from '../lib/dataStore';
 
 const nav = [
   { to: '/', label: 'Budget', end: true },
@@ -18,9 +19,7 @@ export function Layout() {
   const navigate = useNavigate();
   const email = getEmail();
   const inboxCount =
-    data?.transactions.filter(
-      (t) => !t.approved || (!t.categoryId && !t.transferAccountId),
-    ).length ?? 0;
+    data?.transactions.filter((t) => isInboxTxn(t, data)).length ?? 0;
 
   return (
     <div className="app-shell">

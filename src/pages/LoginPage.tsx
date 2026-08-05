@@ -2,7 +2,13 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi, getToken, setSession } from '../api/client';
 
-type Step = 'email' | 'password' | 'set-password' | 'mfa' | 'mfa-setup';
+type Step =
+  | 'email'
+  | 'password'
+  | 'set-password'
+  | 'mfa'
+  | 'mfa-setup'
+  | 'forgot';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -54,7 +60,10 @@ export function LoginPage() {
     try {
       const res = await authApi.login(email.trim().toLowerCase(), password);
       if (res.error) throw new Error(res.error);
-      if (res.next === 'mfa' && res.mfaToken) {
+      if (
+        (res.next === 'mfa' || res.next === 'mfa_verify') &&
+        res.mfaToken
+      ) {
         setMfaToken(res.mfaToken);
         setStep('mfa');
         setInfo('Enter the 6-digit code from your authenticator app.');
@@ -66,6 +75,25 @@ export function LoginPage() {
       } else {
         throw new Error('Unexpected login response');
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onForgot(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setInfo(null);
+    try {
+      const res = await authApi.forgotPassword(email.trim().toLowerCase());
+      if (res.error) throw new Error(res.error);
+      setInfo(
+        res.message ||
+          'Check your email for a link to reset your password on this website.',
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -182,6 +210,17 @@ export function LoginPage() {
             <button className="btn btn-primary" disabled={busy} type="submit">
               Continue
             </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setError(null);
+                setInfo(null);
+                setStep('forgot');
+              }}
+            >
+              Forgot password?
+            </button>
           </form>
         )}
 
@@ -204,9 +243,53 @@ export function LoginPage() {
             <button
               type="button"
               className="btn btn-ghost"
+              onClick={() => {
+                setError(null);
+                setInfo(null);
+                setStep('forgot');
+              }}
+            >
+              Forgot password?
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
               onClick={() => setStep('email')}
             >
               Back
+            </button>
+          </form>
+        )}
+
+        {step === 'forgot' && (
+          <form onSubmit={onForgot} className="form">
+            <p className="muted">
+              We will email a one-time link that opens this website so you can
+              choose a new password.
+            </p>
+            <label>
+              Email
+              <input
+                className="input"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoFocus
+              />
+            </label>
+            <button className="btn btn-primary" disabled={busy} type="submit">
+              {busy ? 'Sending…' : 'Send reset link'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                setError(null);
+                setStep(email ? 'password' : 'email');
+              }}
+            >
+              Back to sign in
             </button>
           </form>
         )}

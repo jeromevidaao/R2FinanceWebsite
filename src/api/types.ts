@@ -97,8 +97,14 @@ export interface MfaSetup {
   error?: string | null;
 }
 
+export interface PushReport {
+  pushed?: number;
+  failed?: number;
+  [key: string]: unknown;
+}
+
 export interface CategorizeResult {
   marked?: unknown;
-  push?: unknown;
+  push?: PushReport | null;
   error?: string;
 }

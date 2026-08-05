@@ -115,10 +115,32 @@ export function resolveCategory(
   return group ? `${group.name}: ${cat.name}` : cat.name;
 }
 
-export function isInboxTxn(t: Transaction): boolean {
+/** Hide internal / CC-payment / system categories from the categorize picker. */
+export function isAssignableCategory(
+  groupName?: string | null,
+  categoryName?: string | null,
+): boolean {
+  const g = (groupName || '').toLowerCase();
+  const c = (categoryName || '').toLowerCase();
+  if (g === 'internal master category') return false;
+  if (g === 'credit card payments') return false;
+  if (g === 'hidden categories') return false;
+  if (c === 'uncategorized') return false;
+  if (c.includes('ready to assign')) return false;
+  return true;
+}
+
+export function isInboxTxn(
+  t: Transaction,
+  data?: LedgerData | null,
+): boolean {
   if (!t.approved) return true;
   if (t.transferAccountId) return false;
   if (!t.categoryId) return true;
+  if (data) {
+    const cat = categoryMap(data).get(t.categoryId);
+    if (cat?.name?.toLowerCase() === 'uncategorized') return true;
+  }
   return false;
 }
 

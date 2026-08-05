@@ -179,7 +179,7 @@ export function TxnTable({
                       className="btn btn-ghost btn-sm"
                       onClick={() => onCategorize(t)}
                     >
-                      Categorize
+                      {t.categoryId ? 'Edit' : 'Categorize'}
                     </button>
                   )}
                 </td>

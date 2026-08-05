@@ -19,7 +19,7 @@ export function BudgetPage() {
     const tracking = data.accounts.filter((a) => !a.onBudget && !a.closed);
     const budgetTotal = onBudget.reduce((s, a) => s + a.balance, 0);
     const trackingTotal = tracking.reduce((s, a) => s + a.balance, 0);
-    const inbox = data.transactions.filter(isInboxTxn);
+    const inbox = data.transactions.filter((t) => isInboxTxn(t, data));
     const thisMonth = monthKey(new Date().toISOString().slice(0, 10));
     const monthTxns = data.transactions.filter(
       (t) => monthKey(t.date) === thisMonth && !t.transferAccountId,

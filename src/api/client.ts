@@ -89,6 +89,16 @@ export const authApi = {
   mfaVerify: (mfaToken: string, code: string) =>
     post<AuthLogin>('/v1/auth/mfa/verify', { mfaToken, code }),
   me: () => get<{ email: string; expiresAt: number }>('/v1/auth/me'),
+  forgotPassword: (email: string) =>
+    post<{ ok?: boolean; message?: string; error?: string; website?: string }>(
+      '/v1/auth/forgot-password',
+      { email },
+    ),
+  resetPassword: (token: string, password: string) =>
+    post<{ ok?: boolean; message?: string; error?: string; email?: string }>(
+      '/v1/auth/reset-password',
+      { token, password },
+    ),
 };
 
 // ── Ledger ────────────────────────────────────────────────────────────
