@@ -31,7 +31,16 @@ const BANKS: BankDef[] = [
     logoClass: 'connector-logo chase',
     blurb: 'Plaid Link · credit cards & deposits · read-only',
   },
+  {
+    id: 'vanguard',
+    name: 'Vanguard',
+    short: 'VG',
+    logoClass: 'connector-logo vanguard',
+    blurb: 'Plaid Link · investments / retirement · read-only',
+  },
 ];
+
+const CONNECTOR_IDS: ConnectorId[] = ['boa', 'chase', 'vanguard'];
 
 function formatUsd(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return '—';
@@ -46,10 +55,10 @@ const PENDING_BANK_KEY = 'r2finance_plaid_pending_bank';
 function bankFromStorage(): ConnectorId | null {
   if (typeof window === 'undefined') return null;
   const q = new URLSearchParams(window.location.search).get('bank');
-  if (q === 'boa' || q === 'chase') return q;
+  if (q === 'boa' || q === 'chase' || q === 'vanguard') return q;
   try {
     const s = sessionStorage.getItem(PENDING_BANK_KEY);
-    if (s === 'boa' || s === 'chase') return s;
+    if (s === 'boa' || s === 'chase' || s === 'vanguard') return s;
   } catch {
     /* ignore */
   }
@@ -80,7 +89,7 @@ export function ConnectorsPage() {
   const [linkToken, setLinkToken] = useState<string | null>(null);
 
   const anyStatus = useMemo(
-    () => statuses.boa || statuses.chase || null,
+    () => statuses.boa || statuses.chase || statuses.vanguard || null,
     [statuses],
   );
   const plaidConfigured = anyStatus?.configured ?? false;
@@ -100,23 +109,22 @@ export function ConnectorsPage() {
       }
       const next: Partial<Record<ConnectorId, ConnectorStatus>> = {};
       for (const s of list) {
-        const id = (s.connectorId ||
-          (s.institution?.includes('Chase') ? 'chase' : 'boa')) as ConnectorId;
-        if (id === 'boa' || id === 'chase') next[id] = s;
+        const id = String(s.connectorId || '').toLowerCase() as ConnectorId;
+        if (CONNECTOR_IDS.includes(id)) next[id] = s;
       }
-      // Ensure both keys exist
-      if (!next.boa) next.boa = await connectorsApi.status('boa');
-      if (!next.chase) {
-        try {
-          next.chase = await connectorsApi.status('chase');
-        } catch {
-          /* chase may 404 on very old API */
+      for (const id of CONNECTOR_IDS) {
+        if (!next[id]) {
+          try {
+            next[id] = await connectorsApi.status(id);
+          } catch {
+            /* bank may not be deployed yet */
+          }
         }
       }
       setStatuses(next);
 
       const acctNext: Partial<Record<ConnectorId, ConnectorAccounts>> = {};
-      for (const id of ['boa', 'chase'] as ConnectorId[]) {
+      for (const id of CONNECTOR_IDS) {
         if (next[id]?.connected) {
           try {
             acctNext[id] = await connectorsApi.accounts(id);
@@ -477,13 +485,15 @@ export function ConnectorsPage() {
         <ul className="plain-list">
           <li>
             Opens Plaid Link so you can sign in to{' '}
-            <strong>Bank of America</strong> or <strong>Chase</strong> (OAuth)
-            and grant read access to accounts and credit cards.
+            <strong>Bank of America</strong>, <strong>Chase</strong>, or{' '}
+            <strong>Vanguard</strong> and grant read access to accounts,
+            credit cards, and investments.
           </li>
           <li>
             Stores each Plaid <code>access_token</code> in SSM SecureString (
             <code>/r2finance/connectors/boa</code>,{' '}
-            <code>/r2finance/connectors/chase</code>), never in git or the
+            <code>/r2finance/connectors/chase</code>,{' '}
+            <code>/r2finance/connectors/vanguard</code>), never in git or the
             browser. API keys live at <code>/r2finance/plaid</code>.
           </li>
           <li>

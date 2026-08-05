@@ -666,6 +666,10 @@ select {
   background: linear-gradient(135deg, #117aca, #0b4f8a);
   font-size: 0.68rem;
 }
+.connector-logo.vanguard {
+  background: linear-gradient(135deg, #96151d, #6b0f14);
+  font-size: 0.72rem;
+}
 .connector-head h2 {
   margin: 0 0 2px;
 }

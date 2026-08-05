@@ -25,7 +25,7 @@ Full-scale **R2Finance** web app — YNAB-grade multi-account register, inbox, c
 | **Payees** | Search + activity totals |
 | **Reports** | Month spend by category / payee / account + 6-month trend |
 | **More / sync** | Plan meta, stats, pull / push / tick / full import |
-| **Connectors** | Bank of America + Chase via Plaid Link (access only; no DDB txn import yet) |
+| **Connectors** | BoA + Chase + Vanguard via Plaid Link (access only; no DDB txn import yet) |
 
 This site **never** talks to YNAB directly. Sync and PATs stay in R2FinanceAPI + Secrets Manager.
 Plaid client secrets stay on the API; the browser only receives short-lived Link tokens.

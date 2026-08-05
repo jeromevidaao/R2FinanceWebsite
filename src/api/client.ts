@@ -129,7 +129,7 @@ export const ledgerApi = {
 };
 
 // ── Bank connectors (Plaid — BoA, Chase, …) ───────────────────────────
-export type ConnectorId = 'boa' | 'chase';
+export type ConnectorId = 'boa' | 'chase' | 'vanguard';
 
 export type ConnectorStatus = {
   connectorId?: ConnectorId | string;
