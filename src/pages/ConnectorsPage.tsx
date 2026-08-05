@@ -300,15 +300,12 @@ export function ConnectorsPage() {
       {!plaidConfigured && (
         <div className="alert alert-info">
           <p>
-            <strong>Setup required:</strong> add Plaid API keys to AWS Secrets
-            Manager secret <code>R2Finance/plaid</code> (shared by BoA and
-            Chase):
+            <strong>Setup required:</strong> Plaid API keys must be in AWS SSM
+            SecureString <code>/r2finance/plaid</code> (never in git). Shared by
+            BoA and Chase.
           </p>
-          <pre className="sync-log">{`{
-  "client_id": "…",
-  "secret": "…",
-  "env": "sandbox"
-}`}</pre>
+          <pre className="sync-log">{`aws ssm put-parameter --name /r2finance/plaid --type SecureString \\
+  --value '{"client_id":"…","secret":"…","env":"production"}' --overwrite`}</pre>
           <p className="muted small">
             Register OAuth redirect{' '}
             <code>https://finance.i-liquid.be/connectors</code> in the Plaid
@@ -373,9 +370,9 @@ export function ConnectorsPage() {
                 <dd>Off (by design for this phase)</dd>
               </div>
               <div>
-                <dt>Secret</dt>
+                <dt>SSM item param</dt>
                 <dd className="mono small">
-                  R2Finance/connectors/{bank.id}
+                  /r2finance/connectors/{bank.id}
                 </dd>
               </div>
             </dl>
@@ -484,9 +481,10 @@ export function ConnectorsPage() {
             and grant read access to accounts and credit cards.
           </li>
           <li>
-            Stores each Plaid <code>access_token</code> in Secrets Manager (
-            <code>R2Finance/connectors/boa</code>,{' '}
-            <code>R2Finance/connectors/chase</code>), never in the browser.
+            Stores each Plaid <code>access_token</code> in SSM SecureString (
+            <code>/r2finance/connectors/boa</code>,{' '}
+            <code>/r2finance/connectors/chase</code>), never in git or the
+            browser. API keys live at <code>/r2finance/plaid</code>.
           </li>
           <li>
             Lets you probe live balances/accounts to confirm access works.
