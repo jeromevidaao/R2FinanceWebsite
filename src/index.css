@@ -670,6 +670,10 @@ select {
   background: linear-gradient(135deg, #96151d, #6b0f14);
   font-size: 0.72rem;
 }
+.connector-logo.venmo {
+  background: linear-gradient(135deg, #008cff, #3d95ce);
+  font-size: 0.65rem;
+}
 .connector-head h2 {
   margin: 0 0 2px;
 }

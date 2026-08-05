@@ -40,9 +40,16 @@ const BANKS: BankDef[] = [
     logoClass: 'connector-logo vanguard',
     blurb: 'Plaid Link · investments / retirement · read-only',
   },
+  {
+    id: 'venmo',
+    name: 'Venmo',
+    short: 'Venmo',
+    logoClass: 'connector-logo venmo',
+    blurb: 'Plaid Link · balance & payments · read-only',
+  },
 ];
 
-const CONNECTOR_IDS: ConnectorId[] = ['boa', 'chase', 'vanguard'];
+const CONNECTOR_IDS: ConnectorId[] = ['boa', 'chase', 'vanguard', 'venmo'];
 
 function formatUsd(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return '—';
@@ -57,10 +64,22 @@ const PENDING_BANK_KEY = 'r2finance_plaid_pending_bank';
 function bankFromStorage(): ConnectorId | null {
   if (typeof window === 'undefined') return null;
   const q = new URLSearchParams(window.location.search).get('bank');
-  if (q === 'boa' || q === 'chase' || q === 'vanguard') return q;
+  if (
+    q === 'boa' ||
+    q === 'chase' ||
+    q === 'vanguard' ||
+    q === 'venmo'
+  )
+    return q;
   try {
     const s = sessionStorage.getItem(PENDING_BANK_KEY);
-    if (s === 'boa' || s === 'chase' || s === 'vanguard') return s;
+    if (
+      s === 'boa' ||
+      s === 'chase' ||
+      s === 'vanguard' ||
+      s === 'venmo'
+    )
+      return s;
   } catch {
     /* ignore */
   }
@@ -94,7 +113,12 @@ export function ConnectorsPage() {
   const [linkToken, setLinkToken] = useState<string | null>(null);
 
   const anyStatus = useMemo(
-    () => statuses.boa || statuses.chase || statuses.vanguard || null,
+    () =>
+      statuses.boa ||
+      statuses.chase ||
+      statuses.vanguard ||
+      statuses.venmo ||
+      null,
     [statuses],
   );
   const plaidConfigured = anyStatus?.configured ?? false;
@@ -296,9 +320,9 @@ export function ConnectorsPage() {
         <div>
           <h1>Connectors</h1>
           <p className="muted">
-            Per-person bank links (BoA, Chase, Vanguard). Each household member
-            connects their own accounts — access only, nothing written to the
-            DDB ledger yet.
+            Per-person bank links (BoA, Chase, Vanguard, Venmo). Each household
+            member connects their own accounts — access only, nothing written
+            to the DDB ledger yet.
           </p>
         </div>
         <button
@@ -316,7 +340,7 @@ export function ConnectorsPage() {
         <p className="muted small">
           Signed in as <strong>{ownerEmail || sessionEmail || '—'}</strong>.
           Connect buttons below only update this email’s connectors. Ngoc signs
-          in with her account to link her own BoA / Chase / Vanguard.
+          in with her account to link her own BoA / Chase / Vanguard / Venmo.
         </p>
       </section>
 
@@ -499,7 +523,7 @@ export function ConnectorsPage() {
           <h2>Household overview</h2>
           <p className="muted small">
             Each person can link the same bank types independently (e.g. 2×
-            BoA, 2× Chase, 2× Vanguard).
+            BoA, 2× Chase, 2× Vanguard, 2× Venmo).
           </p>
           <div className="table-wrap">
             <table className="data-table">
@@ -540,12 +564,11 @@ export function ConnectorsPage() {
         <h2>What this does</h2>
         <ul className="plain-list">
           <li>
-            Generic bank catalog (BoA, Chase, Vanguard) — each connection is
-            owned by the signed-in email.
+            Generic bank catalog (BoA, Chase, Vanguard, Venmo) — each
+            connection is owned by the signed-in email.
           </li>
           <li>
-            Jerome and Ngoc each get their own set: up to 2 BoA, 2 Chase, 2
-            Vanguard Items.
+            Jerome and Ngoc each get their own set: up to 2 of every bank type.
           </li>
           <li>
             Tokens live in SSM under{' '}
