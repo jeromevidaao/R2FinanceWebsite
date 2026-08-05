@@ -133,6 +133,9 @@ export type ConnectorId = 'boa' | 'chase' | 'vanguard';
 
 export type ConnectorStatus = {
   connectorId?: ConnectorId | string;
+  /** Owner email — each household member has their own bank links. */
+  email?: string;
+  userKey?: string;
   provider: string;
   institution: string;
   institutionId?: string | null;
@@ -151,6 +154,14 @@ export type ConnectorStatus = {
     subtype?: string | null;
   }>;
   note?: string;
+};
+
+export type HouseholdConnectors = {
+  requester: string;
+  users: Array<{
+    email: string;
+    connectors: ConnectorStatus[];
+  }>;
 };
 
 /** @deprecated use ConnectorStatus */
@@ -177,6 +188,7 @@ export type BoaAccount = ConnectorAccount;
 export type ConnectorAccounts = {
   ok: boolean;
   connectorId?: string;
+  email?: string;
   institutionName?: string;
   itemId?: string | null;
   accounts: ConnectorAccount[];
@@ -198,10 +210,14 @@ export type ConnectorExchangeResult = {
 };
 
 export const connectorsApi = {
+  /** Connectors for the signed-in email only. */
   list: () =>
-    get<{ connectors: ConnectorStatus[] }>('/v1/connectors').then(
-      (r) => r.connectors,
-    ),
+    get<{ email?: string; connectors: ConnectorStatus[] }>(
+      '/v1/connectors',
+    ).then((r) => ({ email: r.email, connectors: r.connectors })),
+  /** All household members × banks (status only). */
+  household: () =>
+    get<HouseholdConnectors>('/v1/connectors?household=1'),
   status: (bank: ConnectorId | string) =>
     get<ConnectorStatus>(`/v1/connectors/${bank}`),
   linkToken: (bank: ConnectorId | string) =>
@@ -210,6 +226,7 @@ export const connectorsApi = {
       expiration?: string;
       institution?: string;
       connectorId?: string;
+      email?: string;
     }>(`/v1/connectors/${bank}/link-token`, {}),
   exchange: (
     bank: ConnectorId | string,
@@ -223,9 +240,13 @@ export const connectorsApi = {
   accounts: (bank: ConnectorId | string) =>
     get<ConnectorAccounts>(`/v1/connectors/${bank}/accounts`),
   disconnect: (bank: ConnectorId | string) =>
-    post<{ ok: boolean; connected: boolean; connectorId?: string }>(
-      `/v1/connectors/${bank}/disconnect`,
-    ),
+    post<{
+      ok: boolean;
+      connected: boolean;
+      connectorId?: string;
+      email?: string;
+    }>(`/v1/connectors/${bank}/disconnect`),
+
 
   // BoA aliases (backward compatible)
   boaStatus: () => get<ConnectorStatus>('/v1/connectors/boa'),

@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
 import {
   connectorsApi,
+  getEmail,
   type ConnectorAccounts,
   type ConnectorId,
   type ConnectorStatus,
+  type HouseholdConnectors,
 } from '../api/client';
 import { ErrorPanel, Loading } from '../components/Loading';
 
@@ -75,12 +77,15 @@ function setPendingBank(bank: ConnectorId | null) {
 }
 
 export function ConnectorsPage() {
+  const sessionEmail = getEmail();
+  const [ownerEmail, setOwnerEmail] = useState<string | null>(sessionEmail);
   const [statuses, setStatuses] = useState<
     Partial<Record<ConnectorId, ConnectorStatus>>
   >({});
   const [accountsByBank, setAccountsByBank] = useState<
     Partial<Record<ConnectorId, ConnectorAccounts>>
   >({});
+  const [household, setHousehold] = useState<HouseholdConnectors | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,16 +102,10 @@ export function ConnectorsPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      let list: ConnectorStatus[];
-      try {
-        list = await connectorsApi.list();
-      } catch {
-        // Fallback if list endpoint not deployed yet
-        list = await Promise.all([
-          connectorsApi.status('boa'),
-          connectorsApi.status('chase'),
-        ]);
-      }
+      const listed = await connectorsApi.list();
+      const list = listed.connectors || [];
+      if (listed.email) setOwnerEmail(listed.email);
+
       const next: Partial<Record<ConnectorId, ConnectorStatus>> = {};
       for (const s of list) {
         const id = String(s.connectorId || '').toLowerCase() as ConnectorId;
@@ -134,6 +133,12 @@ export function ConnectorsPage() {
         }
       }
       setAccountsByBank(acctNext);
+
+      try {
+        setHousehold(await connectorsApi.household());
+      } catch {
+        setHousehold(null);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -291,8 +296,9 @@ export function ConnectorsPage() {
         <div>
           <h1>Connectors</h1>
           <p className="muted">
-            Bank links for credit-card spend tracking. Access only for now —
-            nothing is written to the DDB ledger.
+            Per-person bank links (BoA, Chase, Vanguard). Each household member
+            connects their own accounts — access only, nothing written to the
+            DDB ledger yet.
           </p>
         </div>
         <button
@@ -305,12 +311,20 @@ export function ConnectorsPage() {
         </button>
       </header>
 
+      <section className="panel">
+        <h2>Your links</h2>
+        <p className="muted small">
+          Signed in as <strong>{ownerEmail || sessionEmail || '—'}</strong>.
+          Connect buttons below only update this email’s connectors. Ngoc signs
+          in with her account to link her own BoA / Chase / Vanguard.
+        </p>
+      </section>
+
       {!plaidConfigured && (
         <div className="alert alert-info">
           <p>
             <strong>Setup required:</strong> Plaid API keys must be in AWS SSM
-            SecureString <code>/r2finance/plaid</code> (never in git). Shared by
-            BoA and Chase.
+            SecureString <code>/r2finance/plaid</code> (never in git).
           </p>
           <pre className="sync-log">{`aws ssm put-parameter --name /r2finance/plaid --type SecureString \\
   --value '{"client_id":"…","secret":"…","env":"production"}' --overwrite`}</pre>
@@ -333,7 +347,9 @@ export function ConnectorsPage() {
               </div>
               <div>
                 <h2>{bank.name}</h2>
-                <p className="muted small">{bank.blurb}</p>
+                <p className="muted small">
+                  {bank.blurb} · owner {status?.email || ownerEmail || '—'}
+                </p>
               </div>
               <span
                 className={
@@ -353,6 +369,10 @@ export function ConnectorsPage() {
             </div>
 
             <dl className="kv">
+              <div>
+                <dt>Linked to</dt>
+                <dd>{status?.email || ownerEmail || '—'}</dd>
+              </div>
               <div>
                 <dt>Provider</dt>
                 <dd>{status?.provider || 'plaid'}</dd>
@@ -376,12 +396,6 @@ export function ConnectorsPage() {
               <div>
                 <dt>Ledger import</dt>
                 <dd>Off (by design for this phase)</dd>
-              </div>
-              <div>
-                <dt>SSM item param</dt>
-                <dd className="mono small">
-                  /r2finance/connectors/{bank.id}
-                </dd>
               </div>
             </dl>
 
@@ -480,24 +494,63 @@ export function ConnectorsPage() {
 
       {msg && <pre className="sync-log">{msg}</pre>}
 
+      {household && household.users.length > 0 && (
+        <section className="panel">
+          <h2>Household overview</h2>
+          <p className="muted small">
+            Each person can link the same bank types independently (e.g. 2×
+            BoA, 2× Chase, 2× Vanguard).
+          </p>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Person</th>
+                  <th>Bank</th>
+                  <th>Status</th>
+                  <th className="num">Accounts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {household.users.flatMap((u) =>
+                  u.connectors.map((c) => (
+                    <tr key={`${u.email}-${c.connectorId}`}>
+                      <td>{u.email}</td>
+                      <td>{c.institutionName || c.institution}</td>
+                      <td>
+                        {c.connected ? (
+                          <span className="pill pill-ok">Connected</span>
+                        ) : (
+                          <span className="pill">Not linked</span>
+                        )}
+                      </td>
+                      <td className="num mono">
+                        {c.connected ? (c.accountCount ?? '—') : '—'}
+                      </td>
+                    </tr>
+                  )),
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       <section className="panel">
         <h2>What this does</h2>
         <ul className="plain-list">
           <li>
-            Opens Plaid Link so you can sign in to{' '}
-            <strong>Bank of America</strong>, <strong>Chase</strong>, or{' '}
-            <strong>Vanguard</strong> and grant read access to accounts,
-            credit cards, and investments.
+            Generic bank catalog (BoA, Chase, Vanguard) — each connection is
+            owned by the signed-in email.
           </li>
           <li>
-            Stores each Plaid <code>access_token</code> in SSM SecureString (
-            <code>/r2finance/connectors/boa</code>,{' '}
-            <code>/r2finance/connectors/chase</code>,{' '}
-            <code>/r2finance/connectors/vanguard</code>), never in git or the
-            browser. API keys live at <code>/r2finance/plaid</code>.
+            Jerome and Ngoc each get their own set: up to 2 BoA, 2 Chase, 2
+            Vanguard Items.
           </li>
           <li>
-            Lets you probe live balances/accounts to confirm access works.
+            Tokens live in SSM under{' '}
+            <code>/r2finance/connectors/&#123;userKey&#125;/&#123;bank&#125;</code>
+            , never in git or the browser.
           </li>
           <li>
             <strong>Does not</strong> create or sync transactions into DynamoDB
