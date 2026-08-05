@@ -41,11 +41,28 @@ function formatUsd(n: number | null | undefined): string {
   });
 }
 
-function bankFromQuery(): ConnectorId | null {
+const PENDING_BANK_KEY = 'r2finance_plaid_pending_bank';
+
+function bankFromStorage(): ConnectorId | null {
   if (typeof window === 'undefined') return null;
   const q = new URLSearchParams(window.location.search).get('bank');
   if (q === 'boa' || q === 'chase') return q;
+  try {
+    const s = sessionStorage.getItem(PENDING_BANK_KEY);
+    if (s === 'boa' || s === 'chase') return s;
+  } catch {
+    /* ignore */
+  }
   return null;
+}
+
+function setPendingBank(bank: ConnectorId | null) {
+  try {
+    if (bank) sessionStorage.setItem(PENDING_BANK_KEY, bank);
+    else sessionStorage.removeItem(PENDING_BANK_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 export function ConnectorsPage() {
@@ -138,6 +155,7 @@ export function ConnectorsPage() {
         );
         setLinkToken(null);
         setActiveBank(null);
+        setPendingBank(null);
         // Clean oauth query without full reload
         if (window.location.search.includes('oauth_state_id')) {
           window.history.replaceState({}, '', '/connectors');
@@ -182,13 +200,14 @@ export function ConnectorsPage() {
     }
   }, [linkToken, ready, open]);
 
-  // Resume OAuth return to /connectors?bank=…&oauth_state_id=…
+  // Resume OAuth return to /connectors?oauth_state_id=… (bank from sessionStorage)
   useEffect(() => {
     if (!oauthRedirect || linkToken || busy) return;
-    const bank = bankFromQuery() || activeBank || 'boa';
+    const bank = bankFromStorage() || activeBank || 'boa';
     void (async () => {
       setBusy(true);
       setActiveBank(bank);
+      setPendingBank(bank);
       try {
         const { link_token } = await connectorsApi.linkToken(bank);
         setLinkToken(link_token);
@@ -207,6 +226,7 @@ export function ConnectorsPage() {
     setMsg(null);
     setError(null);
     setActiveBank(bank);
+    setPendingBank(bank);
     try {
       const { link_token } = await connectorsApi.linkToken(bank);
       setLinkToken(link_token);
@@ -290,11 +310,9 @@ export function ConnectorsPage() {
   "env": "sandbox"
 }`}</pre>
           <p className="muted small">
-            Register OAuth redirects for{' '}
-            <code>https://finance.i-liquid.be/connectors</code>,{' '}
-            <code>?bank=boa</code>, and <code>?bank=chase</code> in the Plaid
-            dashboard. Use <code>development</code> or <code>production</code>{' '}
-            for real bank logins.
+            Register OAuth redirect{' '}
+            <code>https://finance.i-liquid.be/connectors</code> in the Plaid
+            dashboard (no query string — Plaid rejects those).
           </p>
         </div>
       )}
