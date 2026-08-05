@@ -12,6 +12,7 @@
   "dependencies": {
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-plaid-link": "^5.0.0",
     "react-router-dom": "^7.18.2"
   },
   "devDependencies": {
@@ -23,5 +24,5 @@
     "typescript": "~6.0.2",
     "vite": "^8.2.0"
   },
-  "description": "R2Finance web app on R2FinanceAPI \u2014 finance.i-liquid.be"
+  "description": "R2Finance web app on R2FinanceAPI — finance.i-liquid.be"
 }

@@ -11,6 +11,7 @@ const nav = [
   { to: '/categories', label: 'Categories' },
   { to: '/payees', label: 'Payees' },
   { to: '/reports', label: 'Reports' },
+  { to: '/connectors', label: 'Connectors' },
   { to: '/more', label: 'More' },
 ];
 

@@ -6,6 +6,7 @@ import { BudgetPage } from './pages/BudgetPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { InboxPage } from './pages/InboxPage';
 import { LoginPage } from './pages/LoginPage';
+import { ConnectorsPage } from './pages/ConnectorsPage';
 import { MorePage } from './pages/MorePage';
 import { PayeesPage } from './pages/PayeesPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="payees" element={<PayeesPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="connectors" element={<ConnectorsPage />} />
         <Route path="more" element={<MorePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

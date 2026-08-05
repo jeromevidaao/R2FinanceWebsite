@@ -638,6 +638,90 @@ select {
   font-size: 0.9rem;
 }
 
+.connector-card .connector-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.connector-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 0.85rem;
+  background: linear-gradient(135deg, #012169, #e31837);
+  color: #fff;
+  flex-shrink: 0;
+}
+.connector-head h2 {
+  margin: 0 0 2px;
+}
+.connector-head .pill {
+  margin-left: auto;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: rgba(139, 155, 176, 0.15);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.pill-ok {
+  background: rgba(61, 204, 145, 0.15);
+  color: var(--pos);
+  border-color: rgba(61, 204, 145, 0.35);
+}
+.pill-warn {
+  background: rgba(240, 180, 41, 0.12);
+  color: var(--warn);
+  border-color: rgba(240, 180, 41, 0.35);
+}
+.plain-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+}
+.plain-list li {
+  margin-bottom: 8px;
+}
+.plain-list strong {
+  color: var(--text);
+}
+.table-wrap {
+  overflow: auto;
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.data-table th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.data-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 960px) {
   .app-shell {
     grid-template-columns: 1fr;

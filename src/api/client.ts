@@ -127,3 +127,80 @@ export const ledgerApi = {
   syncImport: (sinceDate = '1990-01-01') =>
     post<unknown>('/v1/sync/import', { sinceDate }),
 };
+
+// ── Bank connectors (Plaid / BoA) ─────────────────────────────────────
+export type BoaStatus = {
+  provider: string;
+  institution: string;
+  institutionId?: string | null;
+  configured: boolean;
+  connected: boolean;
+  itemId?: string | null;
+  connectedAt?: number | null;
+  connectedBy?: string | null;
+  institutionName?: string;
+  accountCount?: number | null;
+  accountsPreview?: Array<{
+    accountId: string;
+    name: string;
+    mask?: string | null;
+    type?: string | null;
+    subtype?: string | null;
+  }>;
+  note?: string;
+};
+
+export type BoaAccount = {
+  accountId: string;
+  name: string;
+  officialName?: string | null;
+  mask?: string | null;
+  type?: string | null;
+  subtype?: string | null;
+  balances: {
+    available: number | null;
+    current: number | null;
+    limit: number | null;
+    isoCurrencyCode?: string;
+  };
+};
+
+export type BoaAccounts = {
+  ok: boolean;
+  institutionName?: string;
+  itemId?: string | null;
+  accounts: BoaAccount[];
+  importTransactionsToDdb: boolean;
+  source?: string;
+};
+
+export const connectorsApi = {
+  boaStatus: () => get<BoaStatus>('/v1/connectors/boa'),
+  boaLinkToken: () =>
+    getOrPostLinkToken(),
+  boaExchange: (publicToken: string, metadata?: unknown) =>
+    post<{
+      ok: boolean;
+      connected: boolean;
+      itemId: string;
+      institutionName: string;
+      accounts: BoaAccount[];
+      importTransactionsToDdb: boolean;
+    }>('/v1/connectors/boa/exchange', {
+      public_token: publicToken,
+      metadata,
+    }),
+  boaAccounts: () => get<BoaAccounts>('/v1/connectors/boa/accounts'),
+  boaDisconnect: () =>
+    post<{ ok: boolean; connected: boolean }>(
+      '/v1/connectors/boa/disconnect',
+    ),
+};
+
+async function getOrPostLinkToken() {
+  return post<{
+    link_token: string;
+    expiration?: string;
+    institution?: string;
+  }>('/v1/connectors/boa/link-token', {});
+}
