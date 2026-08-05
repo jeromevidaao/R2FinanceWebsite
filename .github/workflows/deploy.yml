@@ -1,0 +1,82 @@
+name: Deploy to AWS
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy website to S3 + CloudFront
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-session-name: github-actions-r2finance-website
+
+      - name: Sync to S3 + invalidate CloudFront
+        run: |
+          set -euo pipefail
+          BUCKET=finance.i-liquid.be
+          DIST_ID=E1KAT8FGSXPPE6
+          SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
+          DEPLOYED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          cat > dist/deploy-version.json <<EOF
+          {
+            "repo": "jeromevidaao/R2FinanceWebsite",
+            "sha": "${SHA}",
+            "deployedAt": "${DEPLOYED_AT}",
+            "bucket": "${BUCKET}",
+            "cloudfrontDistributionId": "${DIST_ID}",
+            "site": "https://finance.i-liquid.be/"
+          }
+          EOF
+
+          aws s3 sync dist/ "s3://$BUCKET/" \
+            --delete \
+            --region us-east-1 \
+            --cache-control "public, max-age=31536000, immutable" \
+            --exclude "index.html" \
+            --exclude "deploy-version.json"
+
+          aws s3 cp dist/index.html "s3://$BUCKET/index.html" \
+            --cache-control "no-cache, must-revalidate" \
+            --content-type "text/html" \
+            --region us-east-1
+
+          aws s3 cp dist/deploy-version.json "s3://$BUCKET/deploy-version.json" \
+            --cache-control "no-cache, must-revalidate" \
+            --content-type "application/json" \
+            --region us-east-1
+
+          INV_ID=$(aws cloudfront create-invalidation \
+            --distribution-id "$DIST_ID" \
+            --paths "/*" \
+            --query 'Invalidation.Id' \
+            --output text)
+          echo "Invalidation: $INV_ID"
+          echo "Deployed $SHA → https://finance.i-liquid.be/"

@@ -1,0 +1,158 @@
+import { ledgerApi } from '../api/client';
+import type {
+  Account,
+  Category,
+  CategoryGroup,
+  Payee,
+  Plan,
+  Stats,
+  Transaction,
+} from '../api/types';
+
+export interface LedgerData {
+  plan: Plan;
+  stats: Stats | null;
+  accounts: Account[];
+  groups: CategoryGroup[];
+  categories: Category[];
+  payees: Payee[];
+  transactions: Transaction[];
+  loadedAt: number;
+}
+
+type Listener = () => void;
+
+let cache: LedgerData | null = null;
+let loading: Promise<LedgerData> | null = null;
+const listeners = new Set<Listener>();
+
+export function subscribe(fn: Listener): () => void {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+}
+
+function notify() {
+  listeners.forEach((fn) => fn());
+}
+
+export function getCache(): LedgerData | null {
+  return cache;
+}
+
+export async function loadLedger(force = false): Promise<LedgerData> {
+  if (cache && !force) return cache;
+  if (loading && !force) return loading;
+
+  loading = (async () => {
+    const [plan, accounts, catPack, payees, transactions, stats] =
+      await Promise.all([
+        ledgerApi.plan(),
+        ledgerApi.accounts(),
+        ledgerApi.categories(),
+        ledgerApi.payees(),
+        ledgerApi.transactions(),
+        ledgerApi.stats().catch(() => null),
+      ]);
+
+    cache = {
+      plan,
+      stats,
+      accounts,
+      groups: catPack.groups,
+      categories: catPack.categories,
+      payees,
+      transactions: transactions.sort((a, b) =>
+        a.date < b.date ? 1 : a.date > b.date ? -1 : 0,
+      ),
+      loadedAt: Date.now(),
+    };
+    notify();
+    return cache;
+  })();
+
+  try {
+    return await loading;
+  } finally {
+    loading = null;
+  }
+}
+
+export function accountMap(data: LedgerData): Map<string, Account> {
+  return new Map(data.accounts.map((a) => [a.ynabId, a]));
+}
+
+export function categoryMap(data: LedgerData): Map<string, Category> {
+  return new Map(data.categories.map((c) => [c.ynabId, c]));
+}
+
+export function payeeMap(data: LedgerData): Map<string, Payee> {
+  return new Map(data.payees.map((p) => [p.ynabId, p]));
+}
+
+export function resolvePayee(
+  data: LedgerData,
+  payeeId?: string | null,
+): string {
+  if (!payeeId) return '—';
+  return payeeMap(data).get(payeeId)?.name || 'Unknown payee';
+}
+
+export function resolveCategory(
+  data: LedgerData,
+  categoryId?: string | null,
+  txn?: Transaction,
+): string {
+  if (txn?.transferAccountId) {
+    const acct = accountMap(data).get(txn.transferAccountId);
+    return acct ? `Transfer: ${acct.name}` : 'Transfer';
+  }
+  if (!categoryId) return 'Uncategorized';
+  const cat = categoryMap(data).get(categoryId);
+  if (!cat) return 'Unknown category';
+  const group = data.groups.find((g) => g.ynabId === cat.categoryGroupId);
+  return group ? `${group.name}: ${cat.name}` : cat.name;
+}
+
+export function isInboxTxn(t: Transaction): boolean {
+  if (!t.approved) return true;
+  if (t.transferAccountId) return false;
+  if (!t.categoryId) return true;
+  return false;
+}
+
+export function patchTransactionCategory(
+  ynabTxnId: string,
+  categoryYnabId: string,
+) {
+  if (!cache) return;
+  cache = {
+    ...cache,
+    transactions: cache.transactions.map((t) =>
+      t.ynabId === ynabTxnId
+        ? { ...t, categoryId: categoryYnabId, approved: true }
+        : t,
+    ),
+  };
+  notify();
+}
+
+export function accountTypeLabel(type: string): string {
+  const map: Record<string, string> = {
+    checking: 'Checking',
+    savings: 'Savings',
+    cash: 'Cash',
+    creditCard: 'Credit Card',
+    lineOfCredit: 'Line of Credit',
+    otherAsset: 'Asset',
+    otherLiability: 'Liability',
+    mortgage: 'Mortgage',
+    autoLoan: 'Auto Loan',
+    studentLoan: 'Student Loan',
+    personalLoan: 'Personal Loan',
+    medicalDebt: 'Medical Debt',
+    otherDebt: 'Other Debt',
+  };
+  return map[type] || type;
+}

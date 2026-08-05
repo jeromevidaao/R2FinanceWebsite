@@ -1,0 +1,73 @@
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { clearSession, getEmail } from '../api/client';
+import { useLedger } from '../hooks/useLedger';
+
+const nav = [
+  { to: '/', label: 'Budget', end: true },
+  { to: '/accounts', label: 'Accounts' },
+  { to: '/inbox', label: 'Inbox' },
+  { to: '/transactions', label: 'All' },
+  { to: '/categories', label: 'Categories' },
+  { to: '/payees', label: 'Payees' },
+  { to: '/reports', label: 'Reports' },
+  { to: '/more', label: 'More' },
+];
+
+export function Layout() {
+  const { data } = useLedger();
+  const navigate = useNavigate();
+  const email = getEmail();
+  const inboxCount =
+    data?.transactions.filter(
+      (t) => !t.approved || (!t.categoryId && !t.transferAccountId),
+    ).length ?? 0;
+
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark">R2</div>
+          <div>
+            <div className="brand-title">R2Finance</div>
+            <div className="brand-sub">
+              {data?.plan.name || 'Loading…'}
+            </div>
+          </div>
+        </div>
+        <nav className="nav">
+          {nav.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+                isActive ? 'nav-link active' : 'nav-link'
+              }
+            >
+              <span>{item.label}</span>
+              {item.to === '/inbox' && inboxCount > 0 && (
+                <span className="badge">{inboxCount}</span>
+              )}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="sidebar-foot">
+          <div className="muted small">{email}</div>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => {
+              clearSession();
+              navigate('/login');
+            }}
+          >
+            Sign out
+          </button>
+        </div>
+      </aside>
+      <main className="main">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
