@@ -160,6 +160,84 @@ export function patchTransactionCategory(
   notify();
 }
 
+export function patchTransactionCategoryMany(
+  ynabTxnIds: string[],
+  categoryYnabId: string,
+) {
+  if (!cache || ynabTxnIds.length === 0) return;
+  const set = new Set(ynabTxnIds);
+  cache = {
+    ...cache,
+    transactions: cache.transactions.map((t) =>
+      set.has(t.ynabId)
+        ? { ...t, categoryId: categoryYnabId, approved: true }
+        : t,
+    ),
+  };
+  notify();
+}
+
+export function patchTransactionApproved(ynabTxnIds: string[]) {
+  if (!cache || ynabTxnIds.length === 0) return;
+  const set = new Set(ynabTxnIds);
+  cache = {
+    ...cache,
+    transactions: cache.transactions.map((t) =>
+      set.has(t.ynabId) ? { ...t, approved: true } : t,
+    ),
+  };
+  notify();
+}
+
+export function patchTransactionFields(
+  ynabTxnId: string,
+  fields: Partial<
+    Pick<
+      Transaction,
+      'amount' | 'memo' | 'payeeId' | 'categoryId' | 'approved' | 'cleared'
+    >
+  > & { payeeName?: string },
+) {
+  if (!cache) return;
+  cache = {
+    ...cache,
+    transactions: cache.transactions.map((t) =>
+      t.ynabId === ynabTxnId ? { ...t, ...fields } : t,
+    ),
+  };
+  notify();
+}
+
+/** Human category / system type for list rows. */
+export function displayCategoryLabel(
+  data: LedgerData,
+  t: Transaction,
+): string {
+  if (t.transferAccountId) {
+    const acct = accountMap(data).get(t.transferAccountId);
+    return acct ? `Transfer: ${acct.name}` : 'Transfer';
+  }
+  if (!t.categoryId) return 'Uncategorized';
+  const cat = categoryMap(data).get(t.categoryId);
+  if (!cat) return 'Unknown category';
+  if (cat.name.toLowerCase() === 'uncategorized') return 'Uncategorized';
+  if (cat.name.toLowerCase().includes('credit card payment')) {
+    return 'Credit Card Payment';
+  }
+  return cat.name;
+}
+
+export function formatClearedLabel(
+  cleared: string,
+  approved: boolean,
+): string {
+  if (!approved) return 'needs approval';
+  const c = (cleared || 'uncleared').toLowerCase();
+  if (c === 'reconciled') return 'reconciled';
+  if (c === 'cleared') return 'cleared';
+  return 'uncleared';
+}
+
 export function accountTypeLabel(type: string): string {
   const map: Record<string, string> = {
     checking: 'Checking',

@@ -124,11 +124,13 @@ export function BudgetPage() {
       {summary.inbox.length > 0 && (
         <section className="panel alert-panel">
           <div>
-            <strong>{summary.inbox.length} items need attention</strong>
-            <p className="muted">Uncategorized or unapproved transactions</p>
+            <strong>{summary.inbox.length} to approve or categorize</strong>
+            <p className="muted">
+              Select transactions, categorize in bulk, then approve
+            </p>
           </div>
           <Link to="/inbox" className="btn btn-primary">
-            Open inbox
+            Open To approve
           </Link>
         </section>
       )}

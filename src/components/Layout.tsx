@@ -6,7 +6,7 @@ import { isInboxTxn } from '../lib/dataStore';
 const nav = [
   { to: '/', label: 'Budget', end: true },
   { to: '/accounts', label: 'Accounts' },
-  { to: '/inbox', label: 'Inbox' },
+  { to: '/inbox', label: 'To approve' },
   { to: '/transactions', label: 'All' },
   { to: '/categories', label: 'Categories' },
   { to: '/payees', label: 'Payees' },

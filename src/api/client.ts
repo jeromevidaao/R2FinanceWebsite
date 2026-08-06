@@ -130,6 +130,31 @@ export const ledgerApi = {
       categoryYnabId,
       push,
     }),
+  /** Mark one transaction approved (leaves the to-approve list). */
+  approve: (ynabTxnId: string, push = true) =>
+    post<CategorizeResult>('/v1/transactions/approve', {
+      ynabTxnId,
+      push,
+    }),
+  /**
+   * Offline-style patch via device push (memo / amount / payee / approved).
+   * YNAB push happens on backend tick later.
+   */
+  devicePush: (body: {
+    transactions?: Array<{
+      clientId?: string;
+      ynabId?: string;
+      accountId: string;
+      date: string;
+      amount: number;
+      payeeId?: string | null;
+      categoryId?: string | null;
+      memo?: string | null;
+      cleared?: string;
+      approved?: boolean;
+      payeeName?: string;
+    }>;
+  }) => post<{ ok?: boolean; transactions?: unknown[] }>('/v1/device/push', body),
   syncPull: () => post<unknown>('/v1/sync/pull'),
   syncPush: () => post<unknown>('/v1/sync/push'),
   syncTick: () => post<unknown>('/v1/sync/tick'),

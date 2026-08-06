@@ -333,8 +333,8 @@ select {
 .inbox-row {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 4px;
+  gap: 12px;
+  padding: 10px 4px;
   border-bottom: 1px solid var(--border);
   color: inherit;
   text-decoration: none;
@@ -350,6 +350,97 @@ select {
 }
 .row-title {
   font-weight: 600;
+}
+
+/* YNAB-style To approve / categorize spending */
+.inbox-page.has-selection {
+  padding-bottom: 100px;
+}
+.inbox-panel {
+  padding-top: 8px;
+}
+.inbox-day {
+  margin-bottom: 8px;
+}
+.inbox-day-title {
+  margin: 16px 4px 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0.02em;
+}
+.inbox-row.is-selected {
+  background: rgba(61, 204, 145, 0.1);
+  border-radius: 8px;
+}
+.inbox-check {
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  cursor: pointer;
+}
+.inbox-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.inbox-main-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 4px 8px 4px 0;
+  border-radius: 8px;
+}
+.inbox-main-btn:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.inbox-main {
+  flex: 1;
+  min-width: 0;
+}
+.inbox-action-bar {
+  position: fixed;
+  left: var(--sidebar);
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 28px;
+  background: rgba(23, 29, 37, 0.96);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+}
+.inbox-action-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.form-stack label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+@media (max-width: 900px) {
+  .inbox-action-bar {
+    left: 0;
+  }
 }
 
 .ranked-list li {

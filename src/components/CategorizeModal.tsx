@@ -5,6 +5,7 @@ import { formatMoney } from '../lib/money';
 import {
   isAssignableCategory,
   patchTransactionCategory,
+  patchTransactionCategoryMany,
   resolveCategory,
   resolvePayee,
 } from '../lib/dataStore';
@@ -12,12 +13,16 @@ import type { LedgerData } from '../lib/dataStore';
 
 export function CategorizeModal({
   data,
-  txn,
+  transactions,
+  txn: singleTxn,
   onClose,
   onDone,
 }: {
   data: LedgerData;
-  txn: Transaction;
+  /** One or many transactions (bulk applies the same category). */
+  transactions?: Transaction[];
+  /** Back-compat single transaction. */
+  txn?: Transaction;
   onClose: () => void;
   onDone?: () => void;
 }) {
@@ -26,8 +31,19 @@ export function CategorizeModal({
   const [err, setErr] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
 
-  const currentLabel = resolveCategory(data, txn.categoryId, txn);
-  const isRecat = !!txn.categoryId && !txn.transferAccountId;
+  const list = transactions?.length
+    ? transactions
+    : singleTxn
+      ? [singleTxn]
+      : [];
+  const targets = list.filter((t) => !t.transferAccountId);
+  const bulk = targets.length > 1;
+  const primary = targets[0];
+  const currentLabel = primary
+    ? resolveCategory(data, primary.categoryId, primary)
+    : '';
+  const isRecat = !!primary?.categoryId && !bulk;
+  const net = targets.reduce((s, t) => s + t.amount, 0);
 
   const groups = useMemo(() => {
     const byGroup = new Map<string, { group: CategoryGroup; cats: Category[] }>();
@@ -68,25 +84,43 @@ export function CategorizeModal({
   }, [data, q]);
 
   async function pick(catId: string) {
+    if (targets.length === 0) return;
     setBusy(true);
     setErr(null);
     setOkMsg(null);
     try {
-      const result = await ledgerApi.categorize(txn.ynabId, catId, true);
-      patchTransactionCategory(txn.ynabId, catId);
-      const pushed = result.push?.pushed ?? 0;
-      const failed = result.push?.failed ?? 0;
+      let pushed = 0;
+      let failed = 0;
+      // Sequential so YNAB push stays small per call.
+      for (const t of targets) {
+        const result = await ledgerApi.categorize(t.ynabId, catId, true);
+        pushed += result.push?.pushed ?? 0;
+        failed += result.push?.failed ?? 0;
+      }
+      const ids = targets.map((t) => t.ynabId);
+      if (ids.length === 1) {
+        patchTransactionCategory(ids[0], catId);
+      } else {
+        patchTransactionCategoryMany(ids, catId);
+      }
       const catName =
         data.categories.find((c) => c.ynabId === catId)?.name || 'category';
       if (failed > 0) {
-        setOkMsg(`Saved in R2Finance; YNAB push reported failures`);
+        setOkMsg(
+          bulk
+            ? `Saved ${ids.length} in R2Finance; some YNAB pushes failed`
+            : `Saved in R2Finance; YNAB push reported failures`,
+        );
       } else if (pushed > 0) {
-        setOkMsg(`Set to ${catName} · synced to YNAB`);
+        setOkMsg(
+          bulk
+            ? `Set ${ids.length} to ${catName} · synced to YNAB`
+            : `Set to ${catName} · synced to YNAB`,
+        );
       } else {
-        setOkMsg(`Set to ${catName}`);
+        setOkMsg(bulk ? `Set ${ids.length} to ${catName}` : `Set to ${catName}`);
       }
       onDone?.();
-      // Brief success then close
       window.setTimeout(() => onClose(), 450);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -95,15 +129,43 @@ export function CategorizeModal({
     }
   }
 
+  if (targets.length === 0) {
+    return (
+      <div className="modal-backdrop" onClick={onClose}>
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <header className="modal-head">
+            <h2>Categorize</h2>
+            <button type="button" className="btn btn-ghost" onClick={onClose}>
+              Close
+            </button>
+          </header>
+          <p className="muted">
+            Transfers cannot be categorized here. Deselect transfer rows and
+            try again.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <header className="modal-head">
           <div>
-            <h2>{isRecat ? 'Change category' : 'Categorize'}</h2>
+            <h2>
+              {bulk
+                ? `Categorize ${targets.length} transactions`
+                : isRecat
+                  ? 'Change category'
+                  : 'Categorize'}
+            </h2>
             <p className="muted">
-              {resolvePayee(data, txn.payeeId)} · {txn.date} ·{' '}
-              {formatMoney(txn.amount)}
+              {bulk
+                ? `${targets.length} selected · net ${formatMoney(net)}`
+                : primary
+                  ? `${resolvePayee(data, primary.payeeId)} · ${primary.date} · ${formatMoney(primary.amount)}`
+                  : ''}
             </p>
             {isRecat && (
               <p className="muted small">Current: {currentLabel}</p>
@@ -136,12 +198,16 @@ export function CategorizeModal({
                       type="button"
                       disabled={busy}
                       className={
-                        c.ynabId === txn.categoryId ? 'is-current' : undefined
+                        !bulk && primary && c.ynabId === primary.categoryId
+                          ? 'is-current'
+                          : undefined
                       }
                       onClick={() => void pick(c.ynabId)}
                     >
                       {c.name}
-                      {c.ynabId === txn.categoryId ? ' · current' : ''}
+                      {!bulk && primary && c.ynabId === primary.categoryId
+                        ? ' · current'
+                        : ''}
                     </button>
                   </li>
                 ))}
@@ -150,10 +216,32 @@ export function CategorizeModal({
           ))}
         </div>
         <p className="muted small">
-          Writes to R2Finance DynamoDB and immediately pushes the category to
-          YNAB. Categories set in YNAB sync back on the next pull (≤15 min).
+          Writes to R2Finance DynamoDB and pushes the category to YNAB. Applies
+          the same category to every selected transaction.
         </p>
       </div>
     </div>
+  );
+}
+
+/** Back-compat single-txn entry (other pages). */
+export function CategorizeModalSingle({
+  data,
+  txn,
+  onClose,
+  onDone,
+}: {
+  data: LedgerData;
+  txn: Transaction;
+  onClose: () => void;
+  onDone?: () => void;
+}) {
+  return (
+    <CategorizeModal
+      data={data}
+      transactions={[txn]}
+      onClose={onClose}
+      onDone={onDone}
+    />
   );
 }
