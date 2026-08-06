@@ -195,8 +195,13 @@ function emptyTrend(key: string, label: string): TrendPoint {
 }
 
 /**
- * Build a full spending report from ledger transactions (YNAB-style analytics).
- * Transfers are excluded from inflow/outflow and category/payee breakdowns.
+ * Build a full spending report from ledger transactions (YNAB Reflect-style).
+ *
+ * Rules (must match YNAB Reflect totals):
+ * - Exclude transfers (`transferAccountId` set)
+ * - Exclude unapproved transactions (inbox / to-approve)
+ * - Exclude transfer subtransaction lines inside splits
+ * - Outflows only for category/payee spending ranks
  */
 export function buildSpendingReport(opts: {
   transactions: Transaction[];
@@ -208,6 +213,11 @@ export function buildSpendingReport(opts: {
   periodKey: string;
   /** Optional clock override for presets (tests). */
   now?: Date;
+  /**
+   * When true (default), only approved txns count — YNAB Reflect behavior.
+   * Set false only for debugging “all activity including inbox”.
+   */
+  approvedOnly?: boolean;
 }): SpendingReport {
   const {
     transactions,
@@ -218,6 +228,7 @@ export function buildSpendingReport(opts: {
     mode,
     periodKey,
     now,
+    approvedOnly = true,
   } = opts;
 
   const bounds = resolveDateBounds(mode, periodKey, now ?? new Date());
@@ -226,10 +237,11 @@ export function buildSpendingReport(opts: {
   const payeeById = new Map(payees.map((p) => [p.ynabId, p]));
   const acctById = new Map(accounts.map((a) => [a.ynabId, a]));
 
-  const periodTxns = transactions.filter(
-    (t) =>
-      !t.transferAccountId && inBounds(t.date, bounds.from, bounds.to),
-  );
+  const periodTxns = transactions.filter((t) => {
+    if (t.transferAccountId) return false;
+    if (approvedOnly && t.approved === false) return false;
+    return inBounds(t.date, bounds.from, bounds.to);
+  });
 
   let inflow = 0;
   let outflow = 0;
@@ -241,31 +253,50 @@ export function buildSpendingReport(opts: {
   const yearBuckets = new Map<string, TrendPoint>();
 
   for (const t of periodTxns) {
-    if (t.amount > 0) inflow += t.amount;
-    if (t.amount < 0) outflow += t.amount;
+    // Prefer split lines so transfer legs inside a split are not counted as spending
+    const hasSplits = !!(t.subtransactions && t.subtransactions.length > 0);
+    const nonTransferSubs = hasSplits
+      ? t.subtransactions!.filter((s) => !s.transferAccountId)
+      : [];
+    const spendLines = hasSplits
+      ? nonTransferSubs.filter((s) => s.amount < 0)
+      : t.amount < 0
+        ? [{ amount: t.amount, categoryId: t.categoryId, payeeId: t.payeeId }]
+        : [];
 
-    if (t.amount < 0) {
-      const lines =
-        t.subtransactions && t.subtransactions.length > 0
-          ? t.subtransactions.filter((s) => s.amount < 0)
-          : [{ amount: t.amount, categoryId: t.categoryId, payeeId: t.payeeId }];
+    let txnIn = 0;
+    let txnOut = 0;
+    if (hasSplits) {
+      // Parent amount can include transfer splits — use non-transfer lines only
+      for (const s of nonTransferSubs) {
+        if (s.amount > 0) txnIn += s.amount;
+        if (s.amount < 0) txnOut += s.amount;
+      }
+    } else {
+      if (t.amount > 0) txnIn = t.amount;
+      if (t.amount < 0) txnOut = t.amount;
+    }
+    inflow += txnIn;
+    outflow += txnOut;
 
-      for (const line of lines) {
-        const catId = line.categoryId || t.categoryId || '__uncat';
-        byCat.set(catId, (byCat.get(catId) || 0) + line.amount);
+    for (const line of spendLines) {
+      const catId = line.categoryId || t.categoryId || '__uncat';
+      byCat.set(catId, (byCat.get(catId) || 0) + line.amount);
 
-        const cat = catById.get(catId);
-        const gKey = cat?.categoryGroupId || '__nogroup';
-        byGroup.set(gKey, (byGroup.get(gKey) || 0) + line.amount);
+      const cat = catById.get(catId);
+      const gKey = cat?.categoryGroupId || '__nogroup';
+      byGroup.set(gKey, (byGroup.get(gKey) || 0) + line.amount);
 
-        const payeeId = line.payeeId || t.payeeId;
-        if (payeeId) {
-          byPayee.set(payeeId, (byPayee.get(payeeId) || 0) + line.amount);
-        }
+      const payeeId = line.payeeId || t.payeeId;
+      if (payeeId) {
+        byPayee.set(payeeId, (byPayee.get(payeeId) || 0) + line.amount);
       }
     }
 
-    byAccount.set(t.accountId, (byAccount.get(t.accountId) || 0) + t.amount);
+    byAccount.set(
+      t.accountId,
+      (byAccount.get(t.accountId) || 0) + txnIn + txnOut,
+    );
 
     const mk = monthKey(t.date);
     const yk = yearKey(t.date);
@@ -279,13 +310,10 @@ export function buildSpendingReport(opts: {
     const yb = yearBuckets.get(yk)!;
     mb.count += 1;
     yb.count += 1;
-    if (t.amount > 0) {
-      mb.inflow += t.amount;
-      yb.inflow += t.amount;
-    } else if (t.amount < 0) {
-      mb.outflow += t.amount;
-      yb.outflow += t.amount;
-    }
+    mb.inflow += txnIn;
+    yb.inflow += txnIn;
+    mb.outflow += txnOut;
+    yb.outflow += txnOut;
     mb.net = mb.inflow + mb.outflow;
     yb.net = yb.inflow + yb.outflow;
   }

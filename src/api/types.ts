@@ -45,6 +45,8 @@ export interface SubTransaction {
   payeeId?: string | null;
   categoryId?: string | null;
   memo?: string | null;
+  /** Present when this split leg is a transfer (exclude from Reflect spending). */
+  transferAccountId?: string | null;
 }
 
 export interface Transaction {

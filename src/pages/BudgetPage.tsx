@@ -22,7 +22,10 @@ export function BudgetPage() {
     const inbox = data.transactions.filter((t) => isInboxTxn(t, data));
     const thisMonth = monthKey(new Date().toISOString().slice(0, 10));
     const monthTxns = data.transactions.filter(
-      (t) => monthKey(t.date) === thisMonth && !t.transferAccountId,
+      (t) =>
+        monthKey(t.date) === thisMonth &&
+        !t.transferAccountId &&
+        t.approved !== false,
     );
     const inflow = monthTxns
       .filter((t) => t.amount > 0)
