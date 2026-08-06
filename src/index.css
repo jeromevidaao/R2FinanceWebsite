@@ -375,6 +375,68 @@ select {
   color: var(--primary);
   letter-spacing: 0.02em;
 }
+
+/* Category groups with YNAB-style left color rail */
+.inbox-cat-group {
+  margin-bottom: 18px;
+}
+.inbox-cat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px 8px;
+  flex-wrap: wrap;
+}
+.inbox-cat-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.inbox-cat-select {
+  margin-left: auto;
+  font-size: 12px !important;
+  padding: 2px 8px !important;
+  opacity: 0.85;
+}
+.inbox-list--railed {
+  margin-left: 2px;
+}
+.inbox-row--railed {
+  position: relative;
+  padding-left: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  gap: 8px;
+}
+.inbox-row--railed.is-group-last {
+  border-bottom: none;
+  margin-bottom: 4px;
+}
+.inbox-rail {
+  position: absolute;
+  left: 2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--rail-color, #6366f1);
+  border-radius: 0;
+}
+.inbox-row--railed.is-group-first .inbox-rail {
+  top: 6px;
+  border-top-left-radius: 3px;
+  border-top-right-radius: 3px;
+}
+.inbox-row--railed.is-group-last .inbox-rail {
+  bottom: 6px;
+  border-bottom-left-radius: 3px;
+  border-bottom-right-radius: 3px;
+}
+.inbox-row--railed.is-group-first.is-group-last .inbox-rail {
+  top: 8px;
+  bottom: 8px;
+  border-radius: 3px;
+}
+
 .inbox-row.is-selected {
   background: rgba(61, 204, 145, 0.1);
   border-radius: 8px;
@@ -439,6 +501,14 @@ select {
   font-size: 13px;
   line-height: 1;
 }
+.cat-chip-icon--brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cat-chip-icon--brand svg {
+  display: block;
+}
 .cat-chip-label {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -463,6 +533,14 @@ select {
   background: rgba(167, 139, 250, 0.18);
   color: #ddd6fe;
   border-color: rgba(167, 139, 250, 0.35);
+}
+.cat-chip--airbnb {
+  background: rgba(255, 90, 95, 0.18);
+  color: #ffb4b8;
+  border-color: rgba(255, 90, 95, 0.5);
+}
+.cat-chip--airbnb .cat-chip-icon--brand {
+  color: #ff5a5f;
 }
 .pick-cat-btn {
   display: flex !important;

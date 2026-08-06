@@ -1,11 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { CategorizeModal } from '../components/CategorizeModal';
 import { CategoryChip } from '../components/CategoryChip';
 import { ErrorPanel, Loading } from '../components/Loading';
 import { useLedger } from '../hooks/useLedger';
 import { formatMoney, moneyClass } from '../lib/money';
 import { ledgerApi } from '../api/client';
-import { categoryChipForTxn } from '../lib/categoryDisplay';
+import {
+  categoryChipForTxn,
+  groupInboxByCategory,
+} from '../lib/categoryDisplay';
 import {
   formatClearedLabel,
   isInboxTxn,
@@ -14,17 +17,6 @@ import {
   resolvePayee,
 } from '../lib/dataStore';
 import type { Transaction } from '../api/types';
-
-function formatDayHeading(iso: string): string {
-  const d = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
 
 export function InboxPage() {
   const { data, loading, error, refresh } = useLedger();
@@ -40,6 +32,11 @@ export function InboxPage() {
       .filter((t) => isInboxTxn(t, data))
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   }, [data]);
+
+  const categoryGroups = useMemo(() => {
+    if (!data) return [];
+    return groupInboxByCategory(data, items);
+  }, [data, items]);
 
   // Drop selections that left the inbox.
   const liveIds = useMemo(() => new Set(items.map((t) => t.ynabId)), [items]);
@@ -60,16 +57,6 @@ export function InboxPage() {
     [selectedTxns],
   );
 
-  const byDate = useMemo(() => {
-    const map = new Map<string, Transaction[]>();
-    for (const t of items) {
-      const list = map.get(t.date) || [];
-      list.push(t);
-      map.set(t.date, list);
-    }
-    return [...map.entries()];
-  }, [items]);
-
   function toggle(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -81,6 +68,19 @@ export function InboxPage() {
 
   function selectAll() {
     setSelected(new Set(items.map((t) => t.ynabId)));
+  }
+
+  function selectGroup(ids: string[]) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const allSelected = ids.every((id) => next.has(id));
+      if (allSelected) {
+        for (const id of ids) next.delete(id);
+      } else {
+        for (const id of ids) next.add(id);
+      }
+      return next;
+    });
   }
 
   function clearSelection() {
@@ -145,7 +145,7 @@ export function InboxPage() {
               </>
             ) : (
               <>
-                Categorize spending · approve works without a category
+                Grouped by category · approve works without a category
               </>
             )}
           </p>
@@ -190,59 +190,104 @@ export function InboxPage() {
         </div>
       ) : (
         <div className="panel inbox-panel">
-          {byDate.map(([date, rows]) => (
-            <section key={date} className="inbox-day">
-              <h2 className="inbox-day-title">{formatDayHeading(date)}</h2>
-              <ul className="inbox-list">
-                {rows.map((t) => {
-                  const acct = data.accounts.find(
-                    (a) => a.ynabId === t.accountId,
-                  );
-                  const isSel = selectedLive.has(t.ynabId);
-                  return (
-                    <li
-                      key={t.ynabId}
-                      className={`inbox-row ${isSel ? 'is-selected' : ''}`}
-                    >
-                      <label className="inbox-check">
-                        <input
-                          type="checkbox"
-                          checked={isSel}
-                          onChange={() => toggle(t.ynabId)}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        className="inbox-main-btn"
-                        onClick={() => setDetailId(t.ynabId)}
+          {categoryGroups.map((group) => {
+            const groupIds = group.transactions.map((t) => t.ynabId);
+            const selectedInGroup = groupIds.filter((id) =>
+              selectedLive.has(id),
+            ).length;
+            const allGroupSelected =
+              groupIds.length > 0 && selectedInGroup === groupIds.length;
+            return (
+              <section key={group.key} className="inbox-cat-group">
+                <header className="inbox-cat-header">
+                  <span
+                    className="inbox-cat-swatch"
+                    style={{ background: group.railColor }}
+                    aria-hidden
+                  />
+                  <CategoryChip chip={group.chip} />
+                  <span className="muted small">
+                    {group.transactions.length}
+                    {selectedInGroup > 0 && selectedInGroup < groupIds.length
+                      ? ` · ${selectedInGroup} selected`
+                      : ''}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm inbox-cat-select"
+                    onClick={() => selectGroup(groupIds)}
+                  >
+                    {allGroupSelected ? 'Deselect' : 'Select'}
+                  </button>
+                </header>
+                <ul className="inbox-list inbox-list--railed">
+                  {group.transactions.map((t, idx) => {
+                    const acct = data.accounts.find(
+                      (a) => a.ynabId === t.accountId,
+                    );
+                    const isSel = selectedLive.has(t.ynabId);
+                    const isFirst = idx === 0;
+                    const isLast = idx === group.transactions.length - 1;
+                    return (
+                      <li
+                        key={t.ynabId}
+                        className={[
+                          'inbox-row',
+                          'inbox-row--railed',
+                          isSel ? 'is-selected' : '',
+                          isFirst ? 'is-group-first' : '',
+                          isLast ? 'is-group-last' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        style={
+                          {
+                            '--rail-color': group.railColor,
+                          } as CSSProperties
+                        }
                       >
-                        <div className="inbox-main">
-                          <div className="row-title">
-                            {resolvePayee(data, t.payeeId)}
+                        <span className="inbox-rail" aria-hidden />
+                        <label className="inbox-check">
+                          <input
+                            type="checkbox"
+                            checked={isSel}
+                            onChange={() => toggle(t.ynabId)}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="inbox-main-btn"
+                          onClick={() => setDetailId(t.ynabId)}
+                        >
+                          <div className="inbox-main">
+                            <div className="row-title">
+                              {resolvePayee(data, t.payeeId)}
+                            </div>
+                            <div className="inbox-meta">
+                              <span className="muted small">
+                                {t.date} · {acct?.name || 'Account'} ·{' '}
+                                {formatClearedLabel(t.cleared, t.approved)}
+                              </span>
+                            </div>
+                            {t.memo && (
+                              <div className="muted small">{t.memo}</div>
+                            )}
                           </div>
-                          <div className="inbox-meta">
-                            <CategoryChip chip={categoryChipForTxn(data, t)} />
-                            <span className="muted small">
-                              {acct?.name || 'Account'} ·{' '}
-                              {formatClearedLabel(t.cleared, t.approved)}
-                            </span>
+                          <div className={`mono ${moneyClass(t.amount)}`}>
+                            {formatMoney(
+                              t.amount,
+                              data.plan.currency || 'USD',
+                              { sign: true },
+                            )}
                           </div>
-                          {t.memo && (
-                            <div className="muted small">{t.memo}</div>
-                          )}
-                        </div>
-                        <div className={`mono ${moneyClass(t.amount)}`}>
-                          {formatMoney(t.amount, data.plan.currency || 'USD', {
-                            sign: true,
-                          })}
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            );
+          })}
         </div>
       )}
 
@@ -269,8 +314,7 @@ export function InboxPage() {
               type="button"
               className="btn btn-primary"
               disabled={
-                busy ||
-                selectedTxns.every((t) => !!t.transferAccountId)
+                busy || selectedTxns.every((t) => !!t.transferAccountId)
               }
               onClick={() =>
                 setCategorizeIds(
