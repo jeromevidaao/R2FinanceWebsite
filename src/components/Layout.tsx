@@ -7,7 +7,7 @@ import { isInboxTxn } from '../lib/dataStore';
 const primaryNav = [
   { to: '/', label: 'Home', end: true },
   { to: '/inbox', label: 'Spending' },
-  { to: '/accounts', label: 'Account' },
+  { to: '/accounts', label: 'Accounts' },
   { to: '/reports', label: 'Reflect' },
 ];
 

@@ -236,21 +236,4 @@ export function formatClearedLabel(
   return 'uncleared';
 }
 
-export function accountTypeLabel(type: string): string {
-  const map: Record<string, string> = {
-    checking: 'Checking',
-    savings: 'Savings',
-    cash: 'Cash',
-    creditCard: 'Credit Card',
-    lineOfCredit: 'Line of Credit',
-    otherAsset: 'Asset',
-    otherLiability: 'Liability',
-    mortgage: 'Mortgage',
-    autoLoan: 'Auto Loan',
-    studentLoan: 'Student Loan',
-    personalLoan: 'Personal Loan',
-    medicalDebt: 'Medical Debt',
-    otherDebt: 'Other Debt',
-  };
-  return map[type] || type;
-}
+export { accountTypeLabel } from './accountGroups';

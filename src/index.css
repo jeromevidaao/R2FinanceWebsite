@@ -350,12 +350,92 @@ select {
   text-decoration: none;
 }
 .account-row > div:last-child,
+.account-row .account-balance,
 .inbox-row .mono {
   margin-left: auto;
   font-weight: 600;
 }
 .row-title {
   font-weight: 600;
+}
+
+/* —— Accounts screen (YNAB-style Cash / Credit / Tracking) —— */
+.accounts-page .page-header {
+  align-items: center;
+}
+.accounts-add-btn {
+  min-width: 42px;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+.accounts-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+  max-width: 520px;
+}
+.accounts-summary-card .stat-value {
+  font-size: 1.25rem;
+}
+.account-group-panel {
+  padding-top: 14px;
+  padding-bottom: 8px;
+}
+.account-group-head {
+  margin-bottom: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.account-group-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 700;
+}
+.account-group-total {
+  font-size: 1rem;
+  font-weight: 700;
+}
+.account-list .account-row {
+  padding: 12px 6px;
+  border-radius: 8px;
+  border-bottom-color: rgba(42, 53, 68, 0.65);
+}
+.account-list li:last-child .account-row {
+  border-bottom: none;
+}
+.account-icon {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  user-select: none;
+}
+.account-row-main {
+  min-width: 0;
+  flex: 1;
+}
+.account-row-main .row-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-balance {
+  flex: 0 0 auto;
+  font-size: 1.02rem;
+  white-space: nowrap;
 }
 
 /* YNAB-style To approve / categorize spending */
