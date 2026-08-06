@@ -3,12 +3,12 @@ import { clearSession, getEmail } from '../api/client';
 import { useLedger } from '../hooks/useLedger';
 import { isInboxTxn } from '../lib/dataStore';
 
-/** Primary bottom-nav parity: Home · Spending · Account · Report */
+/** Primary bottom-nav parity: Home · Spending · Account · Reflect */
 const primaryNav = [
   { to: '/', label: 'Home', end: true },
   { to: '/inbox', label: 'Spending' },
   { to: '/accounts', label: 'Account' },
-  { to: '/reports', label: 'Report' },
+  { to: '/reports', label: 'Reflect' },
 ];
 
 const secondaryNav = [

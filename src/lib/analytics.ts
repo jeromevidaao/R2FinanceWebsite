@@ -7,8 +7,25 @@ import type {
 } from '../api/types';
 import { monthKey } from './money';
 
-/** Report period granularity (YNAB-style). */
-export type PeriodMode = 'month' | 'year' | 'all';
+/** Report period: single month, calendar year, all time, or named preset. */
+export type PeriodMode = 'month' | 'year' | 'all' | 'preset';
+
+export type PresetId =
+  | 'last3'
+  | 'last6'
+  | 'last12'
+  | 'ytd'
+  | 'lastYear'
+  | 'all';
+
+export const PRESET_OPTIONS: { id: PresetId; label: string }[] = [
+  { id: 'last3', label: 'Last 3 Months' },
+  { id: 'last6', label: 'Last 6 Months' },
+  { id: 'last12', label: 'Last 12 Months' },
+  { id: 'ytd', label: 'Year to Date' },
+  { id: 'lastYear', label: 'Last Year' },
+  { id: 'all', label: 'All Dates' },
+];
 
 export type RankRow = {
   id: string;
@@ -43,7 +60,7 @@ export type SpendingReport = {
   byGroup: RankRow[];
   byPayee: RankRow[];
   byAccount: RankRow[];
-  /** Monthly series (for year or rolling 12 / available months). */
+  /** Monthly series within the selected period. */
   monthlyTrend: TrendPoint[];
   /** Yearly series (all-time / multi-year). */
   yearlyTrend: TrendPoint[];
@@ -67,9 +84,78 @@ export function listYears(transactions: Transaction[]): string[] {
   return [...set].sort().reverse();
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+function ymd(y: number, m0: number, d: number): string {
+  return `${y}-${pad2(m0 + 1)}-${pad2(d)}`;
+}
+
+function lastDayOfMonth(y: number, m0: number): number {
+  return new Date(Date.UTC(y, m0 + 1, 0)).getUTCDate();
+}
+
+/** Inclusive date bounds for a report period. null from/to = unbounded side. */
+export function resolveDateBounds(
+  mode: PeriodMode,
+  periodKey: string,
+  now = new Date(),
+): { from: string | null; to: string | null; label: string } {
+  const y = now.getFullYear();
+  const m0 = now.getMonth();
+
+  if (mode === 'all' || (mode === 'preset' && periodKey === 'all')) {
+    return { from: null, to: null, label: 'All Dates' };
+  }
+  if (mode === 'month') {
+    const [yy, mm] = periodKey.split('-').map(Number);
+    if (!yy || !mm) return { from: null, to: null, label: periodKey };
+    const from = ymd(yy, mm - 1, 1);
+    const to = ymd(yy, mm - 1, lastDayOfMonth(yy, mm - 1));
+    return { from, to, label: formatPeriodLabel('month', periodKey) };
+  }
+  if (mode === 'year') {
+    const yy = Number(periodKey) || y;
+    return {
+      from: ymd(yy, 0, 1),
+      to: ymd(yy, 11, 31),
+      label: String(yy),
+    };
+  }
+  // presets
+  const preset = periodKey as PresetId;
+  if (preset === 'ytd') {
+    return {
+      from: ymd(y, 0, 1),
+      to: ymd(y, m0, lastDayOfMonth(y, m0)),
+      label: 'Year to Date',
+    };
+  }
+  if (preset === 'lastYear') {
+    return {
+      from: ymd(y - 1, 0, 1),
+      to: ymd(y - 1, 11, 31),
+      label: 'Last Year',
+    };
+  }
+  const n =
+    preset === 'last3' ? 3 : preset === 'last6' ? 6 : preset === 'last12' ? 12 : 3;
+  // Inclusive of current month → go back (n - 1) months
+  const start = new Date(Date.UTC(y, m0 - (n - 1), 1));
+  const from = ymd(start.getUTCFullYear(), start.getUTCMonth(), 1);
+  const to = ymd(y, m0, lastDayOfMonth(y, m0));
+  const label =
+    PRESET_OPTIONS.find((p) => p.id === preset)?.label || `Last ${n} Months`;
+  return { from, to, label };
+}
+
 export function formatPeriodLabel(mode: PeriodMode, key: string): string {
-  if (mode === 'all') return 'All time';
+  if (mode === 'all') return 'All Dates';
   if (mode === 'year') return key;
+  if (mode === 'preset') {
+    return PRESET_OPTIONS.find((p) => p.id === key)?.label || key;
+  }
   const [y, m] = key.split('-').map(Number);
   if (!y || !m) return key;
   return new Date(y, m - 1, 1).toLocaleDateString(undefined, {
@@ -78,10 +164,14 @@ export function formatPeriodLabel(mode: PeriodMode, key: string): string {
   });
 }
 
-function inPeriod(date: string, mode: PeriodMode, key: string): boolean {
-  if (mode === 'all') return true;
-  if (mode === 'year') return yearKey(date) === key;
-  return monthKey(date) === key;
+function inBounds(
+  date: string,
+  from: string | null,
+  to: string | null,
+): boolean {
+  if (from && date < from) return false;
+  if (to && date > to) return false;
+  return true;
 }
 
 function rank(
@@ -107,7 +197,6 @@ function emptyTrend(key: string, label: string): TrendPoint {
 /**
  * Build a full spending report from ledger transactions (YNAB-style analytics).
  * Transfers are excluded from inflow/outflow and category/payee breakdowns.
- * Account breakdown uses non-transfer net activity in the period.
  */
 export function buildSpendingReport(opts: {
   transactions: Transaction[];
@@ -117,17 +206,29 @@ export function buildSpendingReport(opts: {
   accounts: Account[];
   mode: PeriodMode;
   periodKey: string;
+  /** Optional clock override for presets (tests). */
+  now?: Date;
 }): SpendingReport {
-  const { transactions, categories, groups, payees, accounts, mode, periodKey } =
-    opts;
+  const {
+    transactions,
+    categories,
+    groups,
+    payees,
+    accounts,
+    mode,
+    periodKey,
+    now,
+  } = opts;
 
+  const bounds = resolveDateBounds(mode, periodKey, now ?? new Date());
   const catById = new Map(categories.map((c) => [c.ynabId, c]));
   const groupById = new Map(groups.map((g) => [g.ynabId, g]));
   const payeeById = new Map(payees.map((p) => [p.ynabId, p]));
   const acctById = new Map(accounts.map((a) => [a.ynabId, a]));
 
   const periodTxns = transactions.filter(
-    (t) => !t.transferAccountId && inPeriod(t.date, mode, periodKey),
+    (t) =>
+      !t.transferAccountId && inBounds(t.date, bounds.from, bounds.to),
   );
 
   let inflow = 0;
@@ -143,9 +244,7 @@ export function buildSpendingReport(opts: {
     if (t.amount > 0) inflow += t.amount;
     if (t.amount < 0) outflow += t.amount;
 
-    // Category / group / payee: outflows only (YNAB spending reports)
     if (t.amount < 0) {
-      // Prefer split lines when present so category totals match YNAB
       const lines =
         t.subtransactions && t.subtransactions.length > 0
           ? t.subtransactions.filter((s) => s.amount < 0)
@@ -209,7 +308,6 @@ export function buildSpendingReport(opts: {
     totalOutAbs,
   ).slice(0, 40);
 
-  // Account rows: show net activity (can be + or −)
   const byAccountRows: RankRow[] = [...byAccount.entries()]
     .sort((a, b) => a[1] - b[1])
     .map(([id, amount]) => ({
@@ -233,7 +331,7 @@ export function buildSpendingReport(opts: {
   return {
     mode,
     periodKey,
-    periodLabel: formatPeriodLabel(mode, periodKey),
+    periodLabel: bounds.label,
     count: periodTxns.length,
     inflow,
     outflow,
@@ -249,12 +347,43 @@ export function buildSpendingReport(opts: {
   };
 }
 
+/** Last N calendar months ending at `endYm` (YYYY-MM), chronological. */
+export function lastNMonthKeys(endYm: string, n: number): string[] {
+  const [y, m] = endYm.split('-').map(Number);
+  if (!y || !m) return [];
+  const keys: string[] = [];
+  for (let i = n - 1; i >= 0; i -= 1) {
+    const d = new Date(Date.UTC(y, m - 1 - i, 1));
+    keys.push(
+      `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}`,
+    );
+  }
+  return keys;
+}
+
+/** Insight for income vs spending over trend points. */
+export function incomeVsSpendingInsight(points: TrendPoint[]): string {
+  if (points.length === 0) return 'Not enough activity yet to compare income and spending.';
+  const avgIn =
+    points.reduce((s, p) => s + p.inflow, 0) / points.length;
+  const avgOut =
+    points.reduce((s, p) => s + Math.abs(p.outflow), 0) / points.length;
+  if (avgOut > avgIn * 1.02) {
+    return "On average, you're spending more than you make.";
+  }
+  if (avgIn > avgOut * 1.02) {
+    return "On average, you're making more than you spend.";
+  }
+  return "On average, income and spending are roughly balanced.";
+}
+
 /** Default period key for a mode given available data. */
 export function defaultPeriodKey(
   mode: PeriodMode,
   transactions: Transaction[],
 ): string {
   if (mode === 'all') return 'all';
+  if (mode === 'preset') return 'last3';
   if (mode === 'year') {
     return listYears(transactions)[0] || String(new Date().getFullYear());
   }
@@ -262,4 +391,9 @@ export function defaultPeriodKey(
     listMonths(transactions)[0] ||
     monthKey(new Date().toISOString().slice(0, 10))
   );
+}
+
+/** Current calendar month key (YYYY-MM). */
+export function currentMonthKey(now = new Date()): string {
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
 }

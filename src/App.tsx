@@ -11,6 +11,7 @@ import { MorePage } from './pages/MorePage';
 import { PayeesPage } from './pages/PayeesPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { SpendingBreakdownPage } from './pages/SpendingBreakdownPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { TransactionsPage } from './pages/TransactionsPage';
 
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="payees" element={<PayeesPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="reports/spending" element={<SpendingBreakdownPage />} />
         <Route path="connectors" element={<ConnectorsPage />} />
         <Route path="more" element={<MorePage />} />
       </Route>

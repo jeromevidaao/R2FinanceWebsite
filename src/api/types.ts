@@ -29,6 +29,8 @@ export interface Category {
   name: string;
   categoryGroupId?: string | null;
   hidden: boolean;
+  /** Hex color from DDB (Reflect / charts). */
+  color?: string | null;
 }
 
 export interface Payee {
