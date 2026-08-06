@@ -130,18 +130,16 @@ export function isAssignableCategory(
   return true;
 }
 
+/**
+ * Spending / to-approve list: unapproved transactions only.
+ * Approve works without a category — approved rows leave this list even if
+ * still uncategorized (category can be set later from the register).
+ */
 export function isInboxTxn(
   t: Transaction,
-  data?: LedgerData | null,
+  _data?: LedgerData | null,
 ): boolean {
-  if (!t.approved) return true;
-  if (t.transferAccountId) return false;
-  if (!t.categoryId) return true;
-  if (data) {
-    const cat = categoryMap(data).get(t.categoryId);
-    if (cat?.name?.toLowerCase() === 'uncategorized') return true;
-  }
-  return false;
+  return !t.approved;
 }
 
 export function patchTransactionCategory(
@@ -208,7 +206,7 @@ export function patchTransactionFields(
   notify();
 }
 
-/** Human category / system type for list rows. */
+/** Human category / system type for list rows. Prefer categoryChipForTxn for UI. */
 export function displayCategoryLabel(
   data: LedgerData,
   t: Transaction,
@@ -217,10 +215,10 @@ export function displayCategoryLabel(
     const acct = accountMap(data).get(t.transferAccountId);
     return acct ? `Transfer: ${acct.name}` : 'Transfer';
   }
-  if (!t.categoryId) return 'Uncategorized';
+  if (!t.categoryId) return 'Category Needed';
   const cat = categoryMap(data).get(t.categoryId);
   if (!cat) return 'Unknown category';
-  if (cat.name.toLowerCase() === 'uncategorized') return 'Uncategorized';
+  if (cat.name.toLowerCase() === 'uncategorized') return 'Category Needed';
   if (cat.name.toLowerCase().includes('credit card payment')) {
     return 'Credit Card Payment';
   }

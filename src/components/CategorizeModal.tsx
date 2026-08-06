@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { ledgerApi } from '../api/client';
 import type { Category, CategoryGroup, Transaction } from '../api/types';
+import { CategoryChip } from './CategoryChip';
+import { categoryChipForCategory, categoryChipForTxn } from '../lib/categoryDisplay';
 import { formatMoney } from '../lib/money';
 import {
   isAssignableCategory,
   patchTransactionCategory,
   patchTransactionCategoryMany,
-  resolveCategory,
   resolvePayee,
 } from '../lib/dataStore';
 import type { LedgerData } from '../lib/dataStore';
@@ -39,10 +40,11 @@ export function CategorizeModal({
   const targets = list.filter((t) => !t.transferAccountId);
   const bulk = targets.length > 1;
   const primary = targets[0];
-  const currentLabel = primary
-    ? resolveCategory(data, primary.categoryId, primary)
-    : '';
-  const isRecat = !!primary?.categoryId && !bulk;
+  const currentChip = primary ? categoryChipForTxn(data, primary) : null;
+  const isRecat =
+    !!primary?.categoryId &&
+    currentChip?.kind !== 'needed' &&
+    !bulk;
   const net = targets.reduce((s, t) => s + t.amount, 0);
 
   const groups = useMemo(() => {
@@ -167,8 +169,15 @@ export function CategorizeModal({
                   ? `${resolvePayee(data, primary.payeeId)} · ${primary.date} · ${formatMoney(primary.amount)}`
                   : ''}
             </p>
-            {isRecat && (
-              <p className="muted small">Current: {currentLabel}</p>
+            {isRecat && currentChip && (
+              <p className="muted small inbox-meta">
+                Current: <CategoryChip chip={currentChip} />
+              </p>
+            )}
+            {!isRecat && currentChip?.kind === 'needed' && (
+              <p className="muted small inbox-meta">
+                <CategoryChip chip={currentChip} />
+              </p>
             )}
           </div>
           <button type="button" className="btn btn-ghost" onClick={onClose}>
@@ -192,25 +201,28 @@ export function CategorizeModal({
             <section key={group.ynabId}>
               <h3 className="group-title">{group.name}</h3>
               <ul className="pick-list">
-                {cats.map((c) => (
-                  <li key={c.ynabId}>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      className={
-                        !bulk && primary && c.ynabId === primary.categoryId
-                          ? 'is-current'
-                          : undefined
-                      }
-                      onClick={() => void pick(c.ynabId)}
-                    >
-                      {c.name}
-                      {!bulk && primary && c.ynabId === primary.categoryId
-                        ? ' · current'
-                        : ''}
-                    </button>
-                  </li>
-                ))}
+                {cats.map((c) => {
+                  const chip = categoryChipForCategory(c.name, group.name);
+                  const isCurrent =
+                    !bulk && primary && c.ynabId === primary.categoryId;
+                  return (
+                    <li key={c.ynabId}>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        className={
+                          isCurrent ? 'pick-cat-btn is-current' : 'pick-cat-btn'
+                        }
+                        onClick={() => void pick(c.ynabId)}
+                      >
+                        <CategoryChip chip={chip} />
+                        {isCurrent ? (
+                          <span className="muted small">current</span>
+                        ) : null}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           ))}

@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { CategorizeModal } from '../components/CategorizeModal';
+import { CategoryChip } from '../components/CategoryChip';
 import { ErrorPanel, Loading } from '../components/Loading';
 import { useLedger } from '../hooks/useLedger';
 import { formatMoney, moneyClass } from '../lib/money';
 import { ledgerApi } from '../api/client';
+import { categoryChipForTxn } from '../lib/categoryDisplay';
 import {
-  displayCategoryLabel,
   formatClearedLabel,
   isInboxTxn,
   patchTransactionApproved,
@@ -143,7 +144,9 @@ export function InboxPage() {
                 </span>
               </>
             ) : (
-              <>Categorize spending · unapproved or uncategorized</>
+              <>
+                Categorize spending · approve works without a category
+              </>
             )}
           </p>
           {banner && <p className="muted small">{banner}</p>}
@@ -217,10 +220,12 @@ export function InboxPage() {
                           <div className="row-title">
                             {resolvePayee(data, t.payeeId)}
                           </div>
-                          <div className="muted small">
-                            {displayCategoryLabel(data, t)} ·{' '}
-                            {acct?.name || 'Account'} ·{' '}
-                            {formatClearedLabel(t.cleared, t.approved)}
+                          <div className="inbox-meta">
+                            <CategoryChip chip={categoryChipForTxn(data, t)} />
+                            <span className="muted small">
+                              {acct?.name || 'Account'} ·{' '}
+                              {formatClearedLabel(t.cleared, t.approved)}
+                            </span>
                           </div>
                           {t.memo && (
                             <div className="muted small">{t.memo}</div>
@@ -389,8 +394,9 @@ function TxnDetailModal({
               {acct?.name || 'Account'} · {txn.date} ·{' '}
               {formatClearedLabel(txn.cleared, txn.approved)}
             </p>
-            <p className="muted small">
-              Category: {displayCategoryLabel(data, txn)}
+            <p className="muted small inbox-meta">
+              Category:{' '}
+              <CategoryChip chip={categoryChipForTxn(data, txn)} />
             </p>
           </div>
           <button type="button" className="btn btn-ghost" onClick={onClose}>
