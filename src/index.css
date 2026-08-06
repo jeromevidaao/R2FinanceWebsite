@@ -98,6 +98,12 @@ select {
   gap: 4px;
   flex: 1;
 }
+.nav-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 10px 8px;
+  opacity: 0.85;
+}
 .nav-link {
   display: flex;
   align-items: center;

@@ -130,7 +130,7 @@ export function BudgetPage() {
             </p>
           </div>
           <Link to="/inbox" className="btn btn-primary">
-            Open To approve
+            Open Spending
           </Link>
         </section>
       )}
@@ -160,7 +160,7 @@ export function BudgetPage() {
             <Link to="/accounts">Accounts & registers</Link>
             <Link to="/transactions">Search all transactions</Link>
             <Link to="/categories">Browse categories</Link>
-            <Link to="/reports">Spending reports</Link>
+            <Link to="/reports">Reflect · spending</Link>
             <Link to="/more">Sync & plan details</Link>
           </div>
           {data.stats && (

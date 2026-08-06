@@ -129,8 +129,8 @@ export function InboxPage() {
             {hasSelection
               ? `${selectedLive.size} selected`
               : items.length > 0
-                ? `To approve (${items.length})`
-                : 'To approve'}
+                ? `Spending (${items.length})`
+                : 'Spending'}
           </h1>
           <p className="muted">
             {hasSelection ? (

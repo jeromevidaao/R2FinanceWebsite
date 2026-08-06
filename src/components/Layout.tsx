@@ -3,14 +3,18 @@ import { clearSession, getEmail } from '../api/client';
 import { useLedger } from '../hooks/useLedger';
 import { isInboxTxn } from '../lib/dataStore';
 
-const nav = [
-  { to: '/', label: 'Budget', end: true },
-  { to: '/accounts', label: 'Accounts' },
-  { to: '/inbox', label: 'To approve' },
+/** Primary bottom-nav parity: Home · Spending · Account · Report */
+const primaryNav = [
+  { to: '/', label: 'Home', end: true },
+  { to: '/inbox', label: 'Spending' },
+  { to: '/accounts', label: 'Account' },
+  { to: '/reports', label: 'Report' },
+];
+
+const secondaryNav = [
   { to: '/transactions', label: 'All' },
   { to: '/categories', label: 'Categories' },
   { to: '/payees', label: 'Payees' },
-  { to: '/reports', label: 'Reports' },
   { to: '/connectors', label: 'Connectors' },
   { to: '/more', label: 'More' },
 ];
@@ -35,7 +39,7 @@ export function Layout() {
           </div>
         </div>
         <nav className="nav">
-          {nav.map((item) => (
+          {primaryNav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -48,6 +52,18 @@ export function Layout() {
               {item.to === '/inbox' && inboxCount > 0 && (
                 <span className="badge">{inboxCount}</span>
               )}
+            </NavLink>
+          ))}
+          <div className="nav-divider" aria-hidden />
+          {secondaryNav.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                isActive ? 'nav-link active' : 'nav-link'
+              }
+            >
+              <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>
