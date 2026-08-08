@@ -67,11 +67,18 @@ export function LoginPage() {
         setMfaToken(res.mfaToken);
         setStep('mfa');
         setInfo('Enter the 6-digit code from your authenticator app.');
-      } else if (res.token) {
-        await finishLogin(res.token, res.email || email);
       } else if (res.next === 'mfa_setup') {
+        // MFA is required for all household users — no password-only sessions.
         setStep('mfa-setup');
-        setInfo('Optional: enable MFA for stronger security.');
+        setInfo(
+          'Authenticator MFA is required. Add this account in Google Authenticator, Authy, or 1Password, then enter a code.',
+        );
+        setSecret(null);
+        setOtpauth(null);
+        setCode('');
+      } else if (res.token) {
+        // Legacy: only possible if MFA already enabled and API issued a token.
+        await finishLogin(res.token, res.email || email);
       } else {
         throw new Error('Unexpected login response');
       }
@@ -113,6 +120,15 @@ export function LoginPage() {
       if (res.error) throw new Error(res.error);
       if (res.token) {
         await finishLogin(res.token, res.email || email);
+      } else if (res.next === 'mfa_setup' || !res.next) {
+        // After first password, force authenticator enrollment (no skip).
+        setStep('mfa-setup');
+        setInfo(
+          'Password saved. Next: set up authenticator MFA (required for all users).',
+        );
+        setSecret(null);
+        setOtpauth(null);
+        setCode('');
       } else {
         setStep('password');
         setInfo('Password saved. Sign in with your new password.');
@@ -339,7 +355,9 @@ export function LoginPage() {
             {!secret ? (
               <>
                 <p className="muted">
-                  You can enable time-based MFA now, or skip and use password-only.
+                  Authenticator MFA is <strong>required</strong> for every
+                  R2Finance account (household security). You cannot use the
+                  app or website with password alone.
                 </p>
                 <button
                   type="button"
@@ -347,18 +365,15 @@ export function LoginPage() {
                   disabled={busy}
                   onClick={() => void startMfaSetup()}
                 >
-                  Set up MFA
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setStep('password')}
-                >
-                  Skip for now
+                  Set up authenticator MFA
                 </button>
               </>
             ) : (
               <form onSubmit={confirmMfaSetup} className="form">
+                <p className="muted small">
+                  Add this secret in Google Authenticator, Authy, or 1Password
+                  (time-based / TOTP), then enter the 6-digit code.
+                </p>
                 <p className="muted small">
                   Secret: <code>{secret}</code>
                 </p>
@@ -372,13 +387,15 @@ export function LoginPage() {
                   <input
                     className="input"
                     inputMode="numeric"
+                    pattern="[0-9]{6}"
                     required
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
+                    autoFocus
                   />
                 </label>
                 <button className="btn btn-primary" disabled={busy} type="submit">
-                  Enable MFA
+                  Enable MFA & continue
                 </button>
               </form>
             )}
