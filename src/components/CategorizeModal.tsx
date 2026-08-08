@@ -143,6 +143,35 @@ export function CategorizeModal({
                   ? `${resolvePayee(data, primary.payeeId)} · ${formatFriendlyDate(primary.date)} · ${formatMoney(primary.amount)}`
                   : ''}
             </p>
+            {!bulk && primary && (primary.locationDisplay || primary.plaidPfc) && (
+              <p
+                className="muted small inbox-meta"
+                title={primary.location?.text || undefined}
+              >
+                {primary.locationDisplay ? `📍 ${primary.locationDisplay}` : null}
+                {primary.locationDisplay && primary.plaidPfc ? ' · ' : null}
+                {primary.plaidPfc || null}
+              </p>
+            )}
+            {bulk &&
+              (() => {
+                const locs = [
+                  ...new Set(
+                    targets
+                      .map((t) => t.locationDisplay)
+                      .filter((s): s is string => !!s),
+                  ),
+                ];
+                if (!locs.length) return null;
+                return (
+                  <p className="muted small inbox-meta">
+                    📍{' '}
+                    {locs.length <= 3
+                      ? locs.join(' · ')
+                      : `${locs.slice(0, 2).join(' · ')} +${locs.length - 2} more`}
+                  </p>
+                );
+              })()}
             {isRecat && currentChip && (
               <p className="muted small inbox-meta">
                 Current: <CategoryChip chip={currentChip} />

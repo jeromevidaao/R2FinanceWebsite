@@ -273,7 +273,9 @@ export function InboxPage() {
                                 {formatClearedLabel(t.cleared, t.approved)}
                                 {t.locationDisplay
                                   ? ` · ${t.locationDisplay}`
-                                  : ''}
+                                  : t.plaidPfc
+                                    ? ` · ${t.plaidPfc}`
+                                    : ''}
                               </span>
                             </div>
                             {t.memo && (
