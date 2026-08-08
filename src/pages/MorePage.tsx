@@ -7,13 +7,8 @@ import {
   type InfluxDay,
   type InfluxSeries,
 } from '../lib/txnInflux';
-import { formatMoney, moneyClass } from '../lib/money';
 
-type ChartMode = 'direction' | 'source';
-type ChartMetric = 'amount' | 'count';
-
-const IN_COLOR = '#3dcc91';
-const OUT_COLOR = '#ff8a96';
+/** Stacked bars: which API path brought the row into the ledger. */
 const YNAB_COLOR = '#6c8cff';
 const R2_COLOR = '#3dcc91';
 
@@ -21,8 +16,6 @@ export function MorePage() {
   const { data, loading, error, refresh } = useLedger();
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<ChartMode>('direction');
-  const [metric, setMetric] = useState<ChartMetric>('amount');
   const [hover, setHover] = useState<InfluxDay | null>(null);
 
   const influx = useMemo(
@@ -49,8 +42,6 @@ export function MorePage() {
     return <ErrorPanel message={error} onRetry={() => void refresh()} />;
   if (!data) return <Loading />;
 
-  const currency = data.plan.currency || 'USD';
-
   return (
     <div className="page">
       <header className="page-header">
@@ -63,12 +54,7 @@ export function MorePage() {
       {influx && (
         <TxnInfluxPanel
           series={influx}
-          currency={currency}
-          mode={mode}
-          metric={metric}
           hover={hover}
-          onMode={setMode}
-          onMetric={setMetric}
           onHover={setHover}
         />
       )}
@@ -197,23 +183,17 @@ export function MorePage() {
   );
 }
 
+/**
+ * 90-day histogram of *how many* ledger rows arrived per day, by API path
+ * (YNAB bridge pull vs R2 device/app push). Counts only — no money.
+ */
 function TxnInfluxPanel({
   series,
-  currency,
-  mode,
-  metric,
   hover,
-  onMode,
-  onMetric,
   onHover,
 }: {
   series: InfluxSeries;
-  currency: string;
-  mode: ChartMode;
-  metric: ChartMetric;
   hover: InfluxDay | null;
-  onMode: (m: ChartMode) => void;
-  onMetric: (m: ChartMetric) => void;
   onHover: (d: InfluxDay | null) => void;
 }) {
   const { totals, buckets, from, to } = series;
@@ -222,22 +202,25 @@ function TxnInfluxPanel({
   const max = useMemo(() => {
     let m = 1;
     for (const b of buckets) {
-      if (mode === 'direction') {
-        if (metric === 'amount') {
-          m = Math.max(m, b.inflow, Math.abs(b.outflow));
-        } else {
-          m = Math.max(m, b.inCount, b.outCount);
-        }
-      } else if (metric === 'amount') {
-        m = Math.max(m, b.ynabAmount, b.r2Amount);
-      } else {
-        m = Math.max(m, b.ynabCount, b.r2Count);
-      }
+      m = Math.max(m, b.ynabCount, b.r2Count, b.totalCount);
     }
     return m;
-  }, [buckets, mode, metric]);
+  }, [buckets]);
 
   const mid = buckets[Math.floor(buckets.length / 2)];
+  const peak = useMemo(() => {
+    let best: InfluxDay | null = null;
+    for (const b of buckets) {
+      if (!best || b.totalCount > best.totalCount) best = b;
+    }
+    return best && best.totalCount > 0 ? best : null;
+  }, [buckets]);
+
+  const ynabPct =
+    totals.totalCount > 0
+      ? Math.round((100 * totals.ynabCount) / totals.totalCount)
+      : 0;
+  const r2Pct = totals.totalCount > 0 ? 100 - ynabPct : 0;
 
   return (
     <section className="panel influx-panel">
@@ -245,112 +228,62 @@ function TxnInfluxPanel({
         <div>
           <h2>Transaction influx · 90 days</h2>
           <p className="muted small" style={{ margin: '4px 0 0' }}>
-            Daily histogram of ledger activity from YNAB + R2Finance ·{' '}
+            Daily API / ledger intake (counts only) · YNAB bridge vs R2 device ·{' '}
             {formatShortRange(from, to)}
           </p>
-        </div>
-        <div className="report-controls">
-          <div className="seg-control" role="group" aria-label="Chart series">
-            <button
-              type="button"
-              className={mode === 'direction' ? 'seg is-active' : 'seg'}
-              onClick={() => onMode('direction')}
-            >
-              In / Out
-            </button>
-            <button
-              type="button"
-              className={mode === 'source' ? 'seg is-active' : 'seg'}
-              onClick={() => onMode('source')}
-            >
-              YNAB / R2
-            </button>
-          </div>
-          <div className="seg-control" role="group" aria-label="Metric">
-            <button
-              type="button"
-              className={metric === 'amount' ? 'seg is-active' : 'seg'}
-              onClick={() => onMetric('amount')}
-            >
-              $
-            </button>
-            <button
-              type="button"
-              className={metric === 'count' ? 'seg is-active' : 'seg'}
-              onClick={() => onMetric('count')}
-            >
-              #
-            </button>
-          </div>
         </div>
       </div>
 
       <div className="influx-stats">
         <div className="influx-stat">
-          <div className="stat-label">Coming in</div>
-          <div className={`stat-value mono ${moneyClass(totals.inflow)}`}>
-            {metric === 'amount'
-              ? formatMoney(totals.inflow, currency, { sign: true })
-              : totals.inCount.toLocaleString()}
+          <div className="stat-label">YNAB API</div>
+          <div className="stat-value mono" style={{ color: YNAB_COLOR }}>
+            {totals.ynabCount.toLocaleString()}
+          </div>
+          <div className="muted small mono" style={{ marginTop: 4 }}>
+            {ynabPct}% of intake
           </div>
         </div>
         <div className="influx-stat">
-          <div className="stat-label">Going out</div>
-          <div className={`stat-value mono ${moneyClass(totals.outflow)}`}>
-            {metric === 'amount'
-              ? formatMoney(totals.outflow, currency)
-              : totals.outCount.toLocaleString()}
+          <div className="stat-label">R2 API</div>
+          <div className="stat-value mono" style={{ color: R2_COLOR }}>
+            {totals.r2Count.toLocaleString()}
+          </div>
+          <div className="muted small mono" style={{ marginTop: 4 }}>
+            {r2Pct}% of intake
           </div>
         </div>
         <div className="influx-stat">
-          <div className="stat-label">Net</div>
-          <div className={`stat-value mono ${moneyClass(totals.net)}`}>
-            {formatMoney(totals.net, currency, { sign: true })}
-          </div>
-        </div>
-        <div className="influx-stat">
-          <div className="stat-label">Transactions</div>
+          <div className="stat-label">Total rows</div>
           <div className="stat-value mono">
             {totals.totalCount.toLocaleString()}
           </div>
           <div className="muted small mono" style={{ marginTop: 4 }}>
-            YNAB {totals.ynabCount.toLocaleString()} · R2{' '}
-            {totals.r2Count.toLocaleString()}
+            ~{(totals.totalCount / Math.max(1, series.days)).toFixed(1)}/day
+          </div>
+        </div>
+        <div className="influx-stat">
+          <div className="stat-label">Peak day</div>
+          <div className="stat-value mono">
+            {peak ? peak.totalCount.toLocaleString() : '—'}
+          </div>
+          <div className="muted small mono" style={{ marginTop: 4 }}>
+            {peak ? peak.label : '—'}
           </div>
         </div>
       </div>
 
       <div className="influx-legend">
-        {mode === 'direction' ? (
-          <>
-            <span className="legend-item">
-              <i className="swatch" style={{ background: IN_COLOR }} /> Coming in
-            </span>
-            <span className="legend-item">
-              <i className="swatch" style={{ background: OUT_COLOR }} /> Going out
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="legend-item">
-              <i className="swatch" style={{ background: YNAB_COLOR }} /> YNAB
-            </span>
-            <span className="legend-item">
-              <i className="swatch" style={{ background: R2_COLOR }} /> R2Finance
-            </span>
-          </>
-        )}
+        <span className="legend-item">
+          <i className="swatch" style={{ background: YNAB_COLOR }} /> YNAB pull
+        </span>
+        <span className="legend-item">
+          <i className="swatch" style={{ background: R2_COLOR }} /> R2 device push
+        </span>
         {active && (
           <span className="influx-hover-chip mono small">
             {active.fullLabel}
-            {mode === 'direction'
-              ? metric === 'amount'
-                ? ` · in ${formatMoney(active.inflow, currency, { sign: true })} · out ${formatMoney(active.outflow, currency)}`
-                : ` · in ${active.inCount} · out ${active.outCount}`
-              : metric === 'amount'
-                ? ` · YNAB ${formatMoney(active.ynabAmount, currency)} · R2 ${formatMoney(active.r2Amount, currency)}`
-                : ` · YNAB ${active.ynabCount} · R2 ${active.r2Count}`}
-            {` · ${active.totalCount} txn${active.totalCount === 1 ? '' : 's'}`}
+            {` · YNAB ${active.ynabCount} · R2 ${active.r2Count} · ${active.totalCount} total`}
           </span>
         )}
       </div>
@@ -362,54 +295,15 @@ function TxnInfluxPanel({
           <div
             className="hist-90"
             role="img"
-            aria-label={
-              mode === 'direction'
-                ? 'Daily histogram of money coming in and going out over 90 days'
-                : 'Daily histogram of YNAB vs R2Finance transactions over 90 days'
-            }
+            aria-label="Daily histogram of YNAB vs R2Finance transaction intake counts over 90 days"
             onMouseLeave={() => onHover(null)}
           >
             {buckets.map((b) => {
-              const a =
-                mode === 'direction'
-                  ? metric === 'amount'
-                    ? b.inflow
-                    : b.inCount
-                  : metric === 'amount'
-                    ? b.ynabAmount
-                    : b.ynabCount;
-              const c =
-                mode === 'direction'
-                  ? metric === 'amount'
-                    ? Math.abs(b.outflow)
-                    : b.outCount
-                  : metric === 'amount'
-                    ? b.r2Amount
-                    : b.r2Count;
+              const a = b.ynabCount;
+              const c = b.r2Count;
               const hA = Math.max(a > 0 ? 3 : 0, (a / max) * 100);
               const hC = Math.max(c > 0 ? 3 : 0, (c / max) * 100);
-              const colorA = mode === 'direction' ? IN_COLOR : YNAB_COLOR;
-              const colorC = mode === 'direction' ? OUT_COLOR : R2_COLOR;
-              const title =
-                mode === 'direction'
-                  ? `${b.fullLabel}\nComing in: ${
-                      metric === 'amount'
-                        ? formatMoney(b.inflow, currency, { sign: true })
-                        : b.inCount
-                    }\nGoing out: ${
-                      metric === 'amount'
-                        ? formatMoney(b.outflow, currency)
-                        : b.outCount
-                    }\n${b.totalCount} transactions`
-                  : `${b.fullLabel}\nYNAB volume: ${
-                      metric === 'amount'
-                        ? formatMoney(b.ynabAmount, currency)
-                        : b.ynabCount
-                    }\nR2Finance volume: ${
-                      metric === 'amount'
-                        ? formatMoney(b.r2Amount, currency)
-                        : b.r2Count
-                    }\n${b.totalCount} transactions`;
+              const title = `${b.fullLabel}\nYNAB: ${b.ynabCount}\nR2Finance: ${b.r2Count}\n${b.totalCount} total`;
 
               return (
                 <div
@@ -421,11 +315,11 @@ function TxnInfluxPanel({
                   <div className="hist-track">
                     <div
                       className="hist-bar"
-                      style={{ height: `${hA}%`, background: colorA }}
+                      style={{ height: `${hA}%`, background: YNAB_COLOR }}
                     />
                     <div
                       className="hist-bar"
-                      style={{ height: `${hC}%`, background: colorC }}
+                      style={{ height: `${hC}%`, background: R2_COLOR }}
                     />
                   </div>
                 </div>
@@ -441,10 +335,9 @@ function TxnInfluxPanel({
       )}
 
       <p className="muted small" style={{ marginBottom: 0, marginTop: 12 }}>
-        <strong>Coming in / going out</strong> uses the transaction amount sign.
-        <strong> YNAB</strong> = rows pulled from the YNAB bridge (no device{' '}
-        <code>clientId</code>). <strong>R2Finance</strong> = rows created or
-        edited via the app/device push path.
+        Counts only — no amounts. <strong>YNAB</strong> = rows pulled through the
+        cloud bridge (no device <code>clientId</code>). <strong>R2</strong> = rows
+        created or edited via app / <code>/v1/device/push</code>.
       </p>
     </section>
   );

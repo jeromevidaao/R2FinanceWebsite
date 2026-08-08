@@ -112,8 +112,13 @@ function emptyDay(key: string): InfluxDay {
  * Build a contiguous daily histogram for the last `days` calendar days
  * (inclusive of today), from ledger transactions.
  *
+ * Primary use (More page): **API intake counts** — `ynabCount` / `r2Count`
+ * per day (which path brought the row into DDB). Money fields (`inflow` /
+ * `outflow` / `*Amount`) are still computed for other callers but the UI
+ * chart is counts-only.
+ *
  * Excludes soft-deleted rows and zero-amount noise. Transfers are included
- * (they still count as ledger influx) — use direction from amount sign.
+ * (they still count as ledger influx).
  */
 export function buildTxnInflux(
   transactions: Transaction[],
