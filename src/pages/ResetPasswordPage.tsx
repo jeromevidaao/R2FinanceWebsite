@@ -67,12 +67,15 @@ export function ResetPasswordPage() {
         )}
 
         {!done && (
-          <form onSubmit={onSubmit} className="form">
-            <label>
+          <form onSubmit={onSubmit} className="form" autoComplete="on">
+            <label htmlFor="r2-reset-password">
               New password
               <input
+                id="r2-reset-password"
                 className="input"
                 type="password"
+                name="new-password"
+                autoComplete="new-password"
                 required
                 minLength={10}
                 value={password}
@@ -81,11 +84,14 @@ export function ResetPasswordPage() {
                 disabled={!token || busy}
               />
             </label>
-            <label>
+            <label htmlFor="r2-reset-password2">
               Confirm password
               <input
+                id="r2-reset-password2"
                 className="input"
                 type="password"
+                name="new-password-confirm"
+                autoComplete="new-password"
                 required
                 minLength={10}
                 value={password2}

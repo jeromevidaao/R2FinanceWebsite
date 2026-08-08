@@ -3,16 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { authApi, getToken, setSession } from '../api/client';
 
 type Step =
-  | 'email'
-  | 'password'
+  | 'sign-in'
   | 'set-password'
   | 'mfa'
   | 'mfa-setup'
   | 'forgot';
 
+/**
+ * Chrome / password-manager autofill needs email + password in the **same**
+ * form, with name + autocomplete attributes. A multi-step “email then password”
+ * flow breaks credential matching.
+ */
 export function LoginPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>('email');
+  const [step, setStep] = useState<Step>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
@@ -27,38 +31,37 @@ export function LoginPage() {
     if (getToken()) navigate('/', { replace: true });
   }, [navigate]);
 
-  async function onEmail(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const st = await authApi.status(email.trim().toLowerCase());
-      if (st.error) throw new Error(st.error);
-      if (st.allowed === false) throw new Error('Email not allowed');
-      if (st.mustSetPassword || !st.exists) {
-        setStep('set-password');
-        setInfo('Choose a password for your R2Finance account.');
-      } else {
-        setStep('password');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function finishLogin(token: string, loginEmail: string) {
     setSession(token, loginEmail);
     navigate('/', { replace: true });
   }
 
-  async function onPassword(e: FormEvent) {
+  async function onSignIn(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    setInfo(null);
+    // Prefer live DOM values so Chrome autofill is captured even if React
+    // state lagged behind (controlled inputs + browser fill).
+    const fd = new FormData(e.currentTarget);
+    const emailVal = String(fd.get('username') || email)
+      .trim()
+      .toLowerCase();
+    const passwordVal = String(fd.get('password') || password);
+    setEmail(emailVal);
+    setPassword(passwordVal);
+
     try {
-      const res = await authApi.login(email.trim().toLowerCase(), password);
+      const st = await authApi.status(emailVal);
+      if (st.error) throw new Error(st.error);
+      if (st.allowed === false) throw new Error('Email not allowed');
+      if (st.mustSetPassword || !st.exists) {
+        setStep('set-password');
+        setInfo('Choose a password for your R2Finance account.');
+        return;
+      }
+
+      const res = await authApi.login(emailVal, passwordVal);
       if (res.error) throw new Error(res.error);
       if (
         (res.next === 'mfa' || res.next === 'mfa_verify') &&
@@ -68,7 +71,6 @@ export function LoginPage() {
         setStep('mfa');
         setInfo('Enter the 6-digit code from your authenticator app.');
       } else if (res.next === 'mfa_setup') {
-        // MFA is required for all household users — no password-only sessions.
         setStep('mfa-setup');
         setInfo(
           'Authenticator MFA is required. Add this account in Google Authenticator, Authy, or 1Password, then enter a code.',
@@ -77,8 +79,7 @@ export function LoginPage() {
         setOtpauth(null);
         setCode('');
       } else if (res.token) {
-        // Legacy: only possible if MFA already enabled and API issued a token.
-        await finishLogin(res.token, res.email || email);
+        await finishLogin(res.token, res.email || emailVal);
       } else {
         throw new Error('Unexpected login response');
       }
@@ -89,13 +90,18 @@ export function LoginPage() {
     }
   }
 
-  async function onForgot(e: FormEvent) {
+  async function onForgot(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     setInfo(null);
+    const fd = new FormData(e.currentTarget);
+    const emailVal = String(fd.get('username') || email)
+      .trim()
+      .toLowerCase();
+    setEmail(emailVal);
     try {
-      const res = await authApi.forgotPassword(email.trim().toLowerCase());
+      const res = await authApi.forgotPassword(emailVal);
       if (res.error) throw new Error(res.error);
       setInfo(
         res.message ||
@@ -108,20 +114,23 @@ export function LoginPage() {
     }
   }
 
-  async function onSetPassword(e: FormEvent) {
+  async function onSetPassword(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    const fd = new FormData(e.currentTarget);
+    const emailVal = String(fd.get('username') || email)
+      .trim()
+      .toLowerCase();
+    const passwordVal = String(fd.get('new-password') || password);
+    setEmail(emailVal);
+    setPassword(passwordVal);
     try {
-      const res = await authApi.setPassword(
-        email.trim().toLowerCase(),
-        password,
-      );
+      const res = await authApi.setPassword(emailVal, passwordVal);
       if (res.error) throw new Error(res.error);
       if (res.token) {
-        await finishLogin(res.token, res.email || email);
+        await finishLogin(res.token, res.email || emailVal);
       } else if (res.next === 'mfa_setup' || !res.next) {
-        // After first password, force authenticator enrollment (no skip).
         setStep('mfa-setup');
         setInfo(
           'Password saved. Next: set up authenticator MFA (required for all users).',
@@ -130,7 +139,7 @@ export function LoginPage() {
         setOtpauth(null);
         setCode('');
       } else {
-        setStep('password');
+        setStep('sign-in');
         setInfo('Password saved. Sign in with your new password.');
       }
     } catch (err) {
@@ -186,7 +195,7 @@ export function LoginPage() {
       if (res.token) {
         await finishLogin(res.token, res.email || email);
       } else {
-        setStep('password');
+        setStep('sign-in');
         setInfo('MFA enabled. Sign in again.');
       }
     } catch (err) {
@@ -210,51 +219,48 @@ export function LoginPage() {
         {info && <div className="alert alert-info">{info}</div>}
         {error && <div className="alert alert-error">{error}</div>}
 
-        {step === 'email' && (
-          <form onSubmit={onEmail} className="form">
-            <label>
+        {step === 'sign-in' && (
+          <form
+            onSubmit={(e) => void onSignIn(e)}
+            className="form"
+            // Helps password managers identify a login form
+            method="post"
+            action="/login"
+            autoComplete="on"
+          >
+            <label htmlFor="r2-username">
               Email
               <input
+                id="r2-username"
                 className="input"
                 type="email"
+                name="username"
+                autoComplete="username"
+                inputMode="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoFocus
               />
             </label>
-            <button className="btn btn-primary" disabled={busy} type="submit">
-              Continue
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => {
-                setError(null);
-                setInfo(null);
-                setStep('forgot');
-              }}
-            >
-              Forgot password?
-            </button>
-          </form>
-        )}
-
-        {step === 'password' && (
-          <form onSubmit={onPassword} className="form">
-            <label>
+            <label htmlFor="r2-password">
               Password
               <input
+                id="r2-password"
                 className="input"
                 type="password"
+                name="password"
+                autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoFocus
               />
             </label>
             <button className="btn btn-primary" disabled={busy} type="submit">
-              Sign in
+              {busy ? 'Signing in…' : 'Sign in'}
             </button>
             <button
               type="button"
@@ -266,28 +272,32 @@ export function LoginPage() {
               }}
             >
               Forgot password?
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => setStep('email')}
-            >
-              Back
             </button>
           </form>
         )}
 
         {step === 'forgot' && (
-          <form onSubmit={onForgot} className="form">
+          <form
+            onSubmit={(e) => void onForgot(e)}
+            className="form"
+            autoComplete="on"
+          >
             <p className="muted">
               We will email a one-time link that opens this website so you can
               choose a new password.
             </p>
-            <label>
+            <label htmlFor="r2-forgot-username">
               Email
               <input
+                id="r2-forgot-username"
                 className="input"
                 type="email"
+                name="username"
+                autoComplete="username"
+                inputMode="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -302,7 +312,7 @@ export function LoginPage() {
               className="btn btn-ghost"
               onClick={() => {
                 setError(null);
-                setStep(email ? 'password' : 'email');
+                setStep('sign-in');
               }}
             >
               Back to sign in
@@ -311,12 +321,33 @@ export function LoginPage() {
         )}
 
         {step === 'set-password' && (
-          <form onSubmit={onSetPassword} className="form">
-            <label>
+          <form
+            onSubmit={(e) => void onSetPassword(e)}
+            className="form"
+            autoComplete="on"
+          >
+            {/* Username in the same form so password managers can save the pair */}
+            <label htmlFor="r2-set-username">
+              Email
+              <input
+                id="r2-set-username"
+                className="input"
+                type="email"
+                name="username"
+                autoComplete="username"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </label>
+            <label htmlFor="r2-new-password">
               New password
               <input
+                id="r2-new-password"
                 className="input"
                 type="password"
+                name="new-password"
+                autoComplete="new-password"
                 required
                 minLength={8}
                 value={password}
@@ -327,17 +358,28 @@ export function LoginPage() {
             <button className="btn btn-primary" disabled={busy} type="submit">
               Save password
             </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setStep('sign-in')}
+            >
+              Back to sign in
+            </button>
           </form>
         )}
 
         {step === 'mfa' && (
-          <form onSubmit={onMfa} className="form">
-            <label>
+          <form onSubmit={onMfa} className="form" autoComplete="off">
+            <p className="muted small">{email}</p>
+            <label htmlFor="r2-otp">
               Authenticator code
               <input
+                id="r2-otp"
                 className="input"
+                name="one-time-code"
                 inputMode="numeric"
                 pattern="[0-9]{6}"
+                autoComplete="one-time-code"
                 required
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
@@ -369,7 +411,7 @@ export function LoginPage() {
                 </button>
               </>
             ) : (
-              <form onSubmit={confirmMfaSetup} className="form">
+              <form onSubmit={confirmMfaSetup} className="form" autoComplete="off">
                 <p className="muted small">
                   Add this secret in Google Authenticator, Authy, or 1Password
                   (time-based / TOTP), then enter the 6-digit code.
@@ -382,12 +424,15 @@ export function LoginPage() {
                     <code>{otpauth}</code>
                   </p>
                 )}
-                <label>
+                <label htmlFor="r2-otp-setup">
                   Confirm code
                   <input
+                    id="r2-otp-setup"
                     className="input"
+                    name="one-time-code"
                     inputMode="numeric"
                     pattern="[0-9]{6}"
+                    autoComplete="one-time-code"
                     required
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
