@@ -285,20 +285,38 @@ export function buildSpendingReport(opts: {
       payeeId: string | null | undefined;
     };
 
-    const lines: Line[] =
-      hasSplits && nonTransferSubs.some((s) => s.amount !== 0)
+    // Prefer non-transfer split legs. If every split is a transfer, attribute
+    // nothing (do not fall back to parent amount — that counted transfers as spend).
+    // Incomplete zero-amount non-transfer legs still fall back to parent.
+    const transferSubsOnly =
+      hasSplits && nonTransferSubs.length === 0 && t.subtransactions!.length > 0;
+    const lines: Line[] = transferSubsOnly
+      ? []
+      : hasSplits && nonTransferSubs.some((s) => s.amount !== 0)
         ? nonTransferSubs.map((s) => ({
             amount: s.amount,
             categoryId: s.categoryId ?? t.categoryId,
             payeeId: s.payeeId ?? t.payeeId,
           }))
-        : [
-            {
-              amount: t.amount,
-              categoryId: t.categoryId,
-              payeeId: t.payeeId,
-            },
-          ];
+        : hasSplits &&
+            nonTransferSubs.length > 0 &&
+            nonTransferSubs.every((s) => s.amount === 0)
+          ? [
+              {
+                amount: t.amount,
+                categoryId: t.categoryId,
+                payeeId: t.payeeId,
+              },
+            ]
+          : [
+              {
+                amount: t.amount,
+                categoryId: t.categoryId,
+                payeeId: t.payeeId,
+              },
+            ];
+
+    if (lines.length === 0) continue;
 
     let txnIn = 0;
     let txnSpendNet = 0;
