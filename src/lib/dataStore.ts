@@ -243,7 +243,10 @@ export async function loadLedger(
     // 2) Network: paged changes call (full when empty / interval). Multi-page
     // merges keep us under the Lambda 6MB response limit (~7k+ txns).
     const pack = await ledgerApi.syncChangesAll(fullDue ? 0 : cursor, fullDue);
-    const stats = await ledgerApi.stats().catch(() => cache?.stats ?? null);
+    const [stats, inbox] = await Promise.all([
+      ledgerApi.stats().catch(() => cache?.stats ?? null),
+      ledgerApi.inbox().catch(() => null),
+    ]);
 
     let next: LedgerData;
     if (pack.mode === 'full' || fullDue || !cache) {
@@ -253,10 +256,40 @@ export async function loadLedger(
       next = { ...next, stats };
     }
 
+    // 3) Always merge authoritative inbox so Categorization matches YNAB even
+    // when an older partial full-sync left unapproved rows out of IndexedDB
+    // (deltas never re-send unchanged unapproved).
+    if (inbox?.transactions?.length) {
+      next = mergeInboxIntoLedger(next, inbox.transactions);
+      if (stats && inbox.count != null) {
+        next = {
+          ...next,
+          stats: {
+            ...stats,
+            inbox: {
+              count: inbox.count,
+              unapproved: inbox.unapproved,
+              uncategorized: inbox.uncategorized,
+            },
+          },
+        };
+      }
+    }
+
+    // 4) If local still far below server txn total, force full next open.
+    const serverTxnTotal = stats?.byType?.transaction ?? 0;
+    const localTxnTotal = next.transactions.length;
+    const underfilled =
+      serverTxnTotal > 0 && localTxnTotal < Math.floor(serverTxnTotal * 0.85);
+
     const nextMeta: LedgerMeta = {
       cursor: pack.cursor || pack.serverTime || now,
       lastFullAt:
-        pack.mode === 'full' || fullDue ? now : lastFullAt || now,
+        pack.mode === 'full' || fullDue
+          ? underfilled
+            ? 0
+            : now
+          : lastFullAt || now,
       lastSyncedAt: now,
     };
     await persist(next, nextMeta);
@@ -330,15 +363,80 @@ export function isAssignableCategory(
 }
 
 /**
- * Spending / to-approve list: unapproved transactions only.
- * Approve works without a category — approved rows leave this list even if
- * still uncategorized (category can be set later from the register).
+ * YNAB-style needs-attention (Categorization):
+ * - unapproved always (including transfers)
+ * - approved + on-budget + no category / "Uncategorized" (no split / transfer)
+ *
+ * Must match API listInbox + Android DomainRules so counts match YNAB (~104).
  */
 export function isInboxTxn(
   t: Transaction,
-  _data?: LedgerData | null,
+  data?: LedgerData | null,
 ): boolean {
-  return !t.approved;
+  if (t.deleted) return false;
+  if (!t.approved) return true;
+  if (t.transferAccountId) return false;
+  const subs = t.subtransactions;
+  if (Array.isArray(subs) && subs.length > 0) return false;
+  if (data) {
+    const acct = accountMap(data).get(t.accountId);
+    if (acct && acct.onBudget === false) return false;
+  }
+  if (!t.categoryId) return true;
+  if (data) {
+    const cat = categoryMap(data).get(t.categoryId);
+    if (cat?.name?.toLowerCase() === 'uncategorized') return true;
+  }
+  return false;
+}
+
+/** Upsert authoritative /v1/inbox rows into a ledger snapshot. */
+function mergeInboxIntoLedger(
+  base: LedgerData,
+  inboxTxns: Transaction[],
+): LedgerData {
+  if (!inboxTxns.length) return base;
+  // Index existing rows by every stable key so we update rather than duplicate.
+  const byAnyKey = new Map<string, Transaction>();
+  for (const t of base.transactions) {
+    const k = txnKey(t);
+    if (k) byAnyKey.set(k, t);
+    if (t.ynabId) byAnyKey.set(t.ynabId, t);
+    if (t.clientId) byAnyKey.set(t.clientId, t);
+    if (t.id) byAnyKey.set(t.id, t);
+  }
+  const final = new Map<string, Transaction>();
+  for (const t of base.transactions) {
+    final.set(txnKey(t), t);
+  }
+  for (const raw of inboxTxns) {
+    const incoming: Transaction = {
+      ...raw,
+      subtransactions: raw.subtransactions || [],
+      deleted: false,
+    };
+    const k = txnKey(incoming);
+    if (!k) continue;
+    const prev =
+      byAnyKey.get(k) ||
+      (incoming.ynabId ? byAnyKey.get(incoming.ynabId) : undefined);
+    const merged = prev
+      ? { ...prev, ...incoming, deleted: false }
+      : incoming;
+    // Drop the previous key if it differed (clientId vs ynabId).
+    if (prev) {
+      const prevKey = txnKey(prev);
+      if (prevKey && prevKey !== k) final.delete(prevKey);
+    }
+    final.set(k, merged);
+    byAnyKey.set(k, merged);
+    if (merged.ynabId) byAnyKey.set(merged.ynabId, merged);
+  }
+  return {
+    ...base,
+    transactions: sortTxns(Array.from(final.values())),
+    loadedAt: Date.now(),
+  };
 }
 
 export function patchTransactionCategory(

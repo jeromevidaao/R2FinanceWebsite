@@ -5,6 +5,7 @@ import type {
   CategorizeResult,
   Category,
   CategoryGroup,
+  InboxResponse,
   MfaSetup,
   Payee,
   Plan,
@@ -123,6 +124,8 @@ export const ledgerApi = {
   categories: () =>
     get<{ groups: CategoryGroup[]; categories: Category[] }>('/v1/categories'),
   payees: () => get<{ payees: Payee[] }>('/v1/payees').then((r) => r.payees),
+  /** Authoritative needs-attention list (unapproved + uncategorized). */
+  inbox: () => get<InboxResponse>('/v1/inbox'),
   transactions: () =>
     get<{ transactions: Transaction[] }>('/v1/transactions').then(
       (r) => r.transactions,

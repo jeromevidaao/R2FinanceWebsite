@@ -135,6 +135,21 @@ export interface Stats {
   planName?: string;
   ynabPlanId?: string;
   serverKnowledge?: number;
+  /** Authoritative needs-attention counts from GET /v1/stats → listInbox. */
+  inbox?: {
+    count: number;
+    unapproved: number;
+    uncategorized: number;
+    error?: string;
+  } | null;
+}
+
+/** Response from GET /v1/inbox (YNAB-style needs-attention). */
+export interface InboxResponse {
+  count: number;
+  unapproved: number;
+  uncategorized: number;
+  transactions: Transaction[];
 }
 
 export interface AuthStatus {
