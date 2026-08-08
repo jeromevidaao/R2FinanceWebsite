@@ -758,6 +758,39 @@ select {
   padding: 10px 12px;
 }
 
+.page-size-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.page-size-select {
+  min-width: 88px !important;
+  width: auto !important;
+}
+
+.txn-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 4px 4px;
+}
+.txn-pagination-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.txn-pagination-ellipsis {
+  padding: 0 4px;
+}
+.txn-pagination-range {
+  min-width: 8rem;
+}
+
 .pill {
   display: inline-block;
   font-size: 0.75rem;

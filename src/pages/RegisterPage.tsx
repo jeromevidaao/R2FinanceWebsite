@@ -116,11 +116,14 @@ export function TxnTable({
   rows,
   onCategorize,
   showAccount,
+  footNote,
 }: {
   data: LedgerData;
   rows: Transaction[];
   onCategorize?: (t: Transaction) => void;
   showAccount?: boolean;
+  /** Override default footer text (e.g. pagination range). */
+  footNote?: string;
 }) {
   return (
     <div className="table-wrap panel">
@@ -227,10 +230,12 @@ export function TxnTable({
         </tbody>
       </table>
       <div className="table-foot muted small">
-        {rows.length.toLocaleString()} transactions
-        {onCategorize
-          ? ' · click a category to change it (syncs to cloud + YNAB)'
-          : ''}
+        {footNote ??
+          `${rows.length.toLocaleString()} transactions${
+            onCategorize
+              ? ' · click a category to change it (syncs to cloud + YNAB)'
+              : ''
+          }`}
       </div>
     </div>
   );
