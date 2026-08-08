@@ -133,22 +133,22 @@ export function TxnTable({
             <th>Category</th>
             <th>Memo</th>
             <th>Status</th>
-            <th className="num">Outflow</th>
-            <th className="num">Inflow</th>
-            <th />
+            <th className="num">Amount</th>
+            {onCategorize && <th className="txn-actions-col">Actions</th>}
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 && (
             <tr>
-              <td colSpan={9} className="muted">
+              <td
+                colSpan={(showAccount ? 7 : 6) + (onCategorize ? 1 : 0)}
+                className="muted"
+              >
                 No transactions
               </td>
             </tr>
           )}
           {rows.map((t) => {
-            const outflow = t.amount < 0 ? t.amount : 0;
-            const inflow = t.amount > 0 ? t.amount : 0;
             const acct = data.accounts.find((a) => a.ynabId === t.accountId);
             const canEditCategory = !!onCategorize && !t.transferAccountId;
             const chip = categoryChipForTxn(data, t);
@@ -201,23 +201,26 @@ export function TxnTable({
                     {formatTxnStatus(t.approved !== false)}
                   </span>
                 </td>
-                <td className={`num mono ${moneyClass(outflow)}`}>
-                  {outflow ? formatMoney(outflow) : ''}
+                <td className={`num mono ${moneyClass(t.amount)}`}>
+                  {formatMoney(t.amount, data.plan.currency || 'USD', {
+                    sign: true,
+                  })}
                 </td>
-                <td className={`num mono ${moneyClass(inflow)}`}>
-                  {inflow ? formatMoney(inflow) : ''}
-                </td>
-                <td>
-                  {canEditCategory && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => onCategorize?.(t)}
-                    >
-                      {t.categoryId ? 'Change category' : 'Categorize'}
-                    </button>
-                  )}
-                </td>
+                {onCategorize && (
+                  <td className="txn-actions-col">
+                    {canEditCategory ? (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => onCategorize(t)}
+                      >
+                        {t.categoryId ? 'Edit category' : 'Categorize'}
+                      </button>
+                    ) : (
+                      <span className="muted small">—</span>
+                    )}
+                  </td>
+                )}
               </tr>
             );
           })}

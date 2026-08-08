@@ -715,6 +715,11 @@ select {
   text-align: right;
   white-space: nowrap;
 }
+.txn-table .txn-actions-col {
+  text-align: right;
+  white-space: nowrap;
+  width: 1%;
+}
 /* Clickable category cell — change category on register / all-txns */
 .txn-cat-btn {
   display: inline-flex;
