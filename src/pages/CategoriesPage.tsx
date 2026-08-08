@@ -1,15 +1,16 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { ledgerApi } from '../api/client';
 import type { Category, CategoryGroup } from '../api/types';
+import { CategoryChip } from '../components/CategoryChip';
 import { ErrorPanel, Loading } from '../components/Loading';
 import { useLedger } from '../hooks/useLedger';
+import { categoryChipForCategory } from '../lib/categoryDisplay';
 import {
   isAssignableCategory,
   mergeCategoriesFromServer,
   removeCategoryLocal,
   upsertCategoryLocal,
 } from '../lib/dataStore';
-import { formatMoney, moneyClass, monthKey } from '../lib/money';
 
 type EditorMode =
   | { kind: 'create' }
@@ -24,22 +25,10 @@ type EditorMode =
 export function CategoriesPage() {
   const { data, loading, error, refresh } = useLedger();
   const [q, setQ] = useState('');
-  const thisMonth = monthKey(new Date().toISOString().slice(0, 10));
   const [editor, setEditor] = useState<EditorMode>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-
-  const spendByCat = useMemo(() => {
-    const map = new Map<string, number>();
-    if (!data) return map;
-    for (const t of data.transactions) {
-      if (monthKey(t.date) !== thisMonth) continue;
-      if (t.amount >= 0 || t.transferAccountId || !t.categoryId) continue;
-      map.set(t.categoryId, (map.get(t.categoryId) || 0) + t.amount);
-    }
-    return map;
-  }, [data, thisMonth]);
 
   const editableGroups = useMemo(() => {
     if (!data) return [] as CategoryGroup[];
@@ -154,7 +143,7 @@ export function CategoriesPage() {
           <h1>Categories</h1>
           <p className="muted">
             {data.categories.filter((c) => !c.hidden).length} categories ·
-            activity for {thisMonth} · changes sync to R2Finance + YNAB
+            changes sync to R2Finance + YNAB
           </p>
         </div>
         <div className="btn-row">
@@ -217,21 +206,25 @@ export function CategoriesPage() {
               ) : (
                 <ul className="ranked-list cat-manage-list">
                   {cats.map((c) => {
-                    const spent = spendByCat.get(c.ynabId) || 0;
                     const canEdit =
                       canEditGroup && isAssignableCategory(group.name, c.name);
                     const busy = busyId === c.ynabId;
+                    const chip = categoryChipForCategory(
+                      c.name,
+                      group.name,
+                      c.ynabId,
+                      c.color,
+                    );
                     return (
                       <li key={c.ynabId} className="cat-manage-row">
-                        <span className="cat-manage-name">{c.name}</span>
-                        <span className={`mono ${moneyClass(spent)}`}>
-                          {spent ? formatMoney(spent) : '—'}
+                        <span className="cat-manage-name">
+                          <CategoryChip chip={chip} />
                         </span>
                         {canEdit ? (
                           <span className="cat-manage-actions">
                             <button
                               type="button"
-                              className="btn btn-ghost btn-sm"
+                              className="btn btn-secondary btn-sm"
                               disabled={!!busyId}
                               onClick={() => {
                                 setErr(null);
@@ -242,7 +235,7 @@ export function CategoriesPage() {
                             </button>
                             <button
                               type="button"
-                              className="btn btn-ghost btn-sm cat-delete-btn"
+                              className="btn btn-secondary btn-sm cat-delete-btn"
                               disabled={!!busyId || busy}
                               onClick={() => void handleDelete(c)}
                             >

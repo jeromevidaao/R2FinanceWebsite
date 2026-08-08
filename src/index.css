@@ -773,15 +773,20 @@ select {
 /* Categories manage (add / edit / delete) */
 .cat-manage-list li.cat-manage-row {
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 .cat-manage-name {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.cat-manage-name .cat-chip {
+  max-width: 100%;
 }
 .cat-manage-actions {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   flex-shrink: 0;
 }
 .cat-manage-locked {
@@ -791,6 +796,10 @@ select {
 }
 .cat-delete-btn {
   color: var(--danger) !important;
+  border-color: rgba(255, 107, 122, 0.35) !important;
+}
+.cat-delete-btn:hover:not(:disabled) {
+  background: rgba(255, 107, 122, 0.12) !important;
 }
 .categories-flash {
   margin: 0 0 12px;
