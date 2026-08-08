@@ -77,53 +77,65 @@ export function InboxPage() {
     [selectedTxns],
   );
 
-  function toggle(id: string) {
+  function setChecked(id: string, checked: boolean) {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  /** Select every on-screen row between two ids (inclusive). */
+  function selectRange(fromId: string, toId: string) {
+    const a = orderedIds.indexOf(fromId);
+    const b = orderedIds.indexOf(toId);
+    if (a < 0 || b < 0) return;
+    const lo = Math.min(a, b);
+    const hi = Math.max(a, b);
+    const range = orderedIds.slice(lo, hi + 1);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const rid of range) next.add(rid);
       return next;
     });
   }
 
   /**
-   * Checkbox / row select:
-   * - plain click → toggle one row, set Shift anchor
-   * - Shift+click → select every row between last anchor and this id
-   *   (inclusive), in visual list order
+   * Plain checkbox change (click / keyboard). Do not use preventDefault on
+   * normal clicks — that broke controlled checkboxes (always-on preventDefault
+   * + empty onChange left the box stuck).
    */
-  function selectWithModifiers(
-    id: string,
-    e: { shiftKey: boolean; preventDefault?: () => void },
-  ) {
-    if (e.shiftKey && lastAnchorIdRef.current) {
-      e.preventDefault?.();
-      const anchor = lastAnchorIdRef.current;
-      const a = orderedIds.indexOf(anchor);
-      const b = orderedIds.indexOf(id);
-      if (a >= 0 && b >= 0) {
-        const lo = Math.min(a, b);
-        const hi = Math.max(a, b);
-        const range = orderedIds.slice(lo, hi + 1);
-        setSelected((prev) => {
-          const next = new Set(prev);
-          for (const rid of range) next.add(rid);
-          return next;
-        });
-        return;
-      }
-    }
-    toggle(id);
+  function onCheckboxChange(id: string, checked: boolean) {
+    setChecked(id, checked);
     lastAnchorIdRef.current = id;
   }
 
+  /**
+   * Shift+click on checkbox: select the visual range from the last anchor.
+   * preventDefault only here so onChange does not also flip this one row.
+   */
   function onCheckboxClick(
     id: string,
     e: ReactMouseEvent<HTMLInputElement>,
   ) {
-    // Controlled checkbox: drive selection ourselves so Shift works.
+    if (!e.shiftKey || !lastAnchorIdRef.current) return;
     e.preventDefault();
-    selectWithModifiers(id, e);
+    selectRange(lastAnchorIdRef.current, id);
+    // Keep the original anchor so repeated Shift+clicks extend from it.
+  }
+
+  /** Shift+click on the row body (not checkbox) — same range select. */
+  function onRowShiftSelect(id: string, e: ReactMouseEvent) {
+    if (!e.shiftKey) return false;
+    e.preventDefault();
+    if (lastAnchorIdRef.current) {
+      selectRange(lastAnchorIdRef.current, id);
+    } else {
+      setChecked(id, true);
+      lastAnchorIdRef.current = id;
+    }
+    return true;
   }
 
   function selectAll() {
@@ -321,31 +333,27 @@ export function InboxPage() {
                         }
                       >
                         <span className="inbox-rail" aria-hidden />
-                        <label className="inbox-check">
+                        <span className="inbox-check">
                           <input
                             type="checkbox"
                             checked={isSel}
+                            onChange={(e) =>
+                              onCheckboxChange(t.ynabId, e.target.checked)
+                            }
                             onClick={(e) => onCheckboxClick(t.ynabId, e)}
-                            onChange={() => {
-                              /* selection handled in onClick (Shift range) */
-                            }}
                             aria-label={
                               isSel
                                 ? `Deselect ${resolvePayee(data, t)}`
                                 : `Select ${resolvePayee(data, t)}`
                             }
                           />
-                        </label>
+                        </span>
                         <button
                           type="button"
                           className="inbox-main-btn"
                           onClick={(e) => {
                             // Shift+click on the row selects a range (same as checkbox).
-                            if (e.shiftKey) {
-                              e.preventDefault();
-                              selectWithModifiers(t.ynabId, e);
-                              return;
-                            }
+                            if (onRowShiftSelect(t.ynabId, e)) return;
                             setDetailId(t.ynabId);
                           }}
                         >
