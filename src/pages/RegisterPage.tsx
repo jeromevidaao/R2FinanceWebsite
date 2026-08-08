@@ -120,12 +120,15 @@ export function TxnTable({
   rows,
   onCategorize,
   showAccount,
+  showMemo = true,
   footNote,
 }: {
   data: LedgerData;
   rows: Transaction[];
   onCategorize?: (t: Transaction) => void;
   showAccount?: boolean;
+  /** When false, hide the Memo column (e.g. all-transactions page). */
+  showMemo?: boolean;
   /** Override default footer text (e.g. pagination range). */
   footNote?: string;
 }) {
@@ -133,9 +136,16 @@ export function TxnTable({
     'txn-table',
     showAccount ? 'txn-table--with-account' : '',
     onCategorize ? 'txn-table--with-actions' : '',
+    showMemo ? '' : 'txn-table--no-memo',
   ]
     .filter(Boolean)
     .join(' ');
+
+  const colCount =
+    5 + // date, payee, category, status, amount
+    (showAccount ? 1 : 0) +
+    (showMemo ? 1 : 0) +
+    (onCategorize ? 1 : 0);
 
   return (
     <div className="table-wrap panel">
@@ -145,7 +155,7 @@ export function TxnTable({
           {showAccount && <col className="txn-col-account" />}
           <col className="txn-col-payee" />
           <col className="txn-col-category" />
-          <col className="txn-col-memo" />
+          {showMemo && <col className="txn-col-memo" />}
           <col className="txn-col-status" />
           <col className="txn-col-amount" />
           {onCategorize && <col className="txn-col-actions" />}
@@ -156,7 +166,7 @@ export function TxnTable({
             {showAccount && <th scope="col">Account</th>}
             <th scope="col">Payee</th>
             <th scope="col">Category</th>
-            <th scope="col">Memo</th>
+            {showMemo && <th scope="col">Memo</th>}
             <th scope="col">Status</th>
             <th scope="col" className="num">
               Amount
@@ -171,10 +181,7 @@ export function TxnTable({
         <tbody>
           {rows.length === 0 && (
             <tr>
-              <td
-                colSpan={(showAccount ? 7 : 6) + (onCategorize ? 1 : 0)}
-                className="muted"
-              >
+              <td colSpan={colCount} className="muted">
                 No transactions
               </td>
             </tr>
@@ -225,9 +232,11 @@ export function TxnTable({
                     <CategoryChip chip={chip} />
                   )}
                 </td>
-                <td className="muted txn-cell-clip" title={memo || undefined}>
-                  {memo}
-                </td>
+                {showMemo && (
+                  <td className="muted txn-cell-clip" title={memo || undefined}>
+                    {memo}
+                  </td>
+                )}
                 <td className="txn-cell-fixed">
                   <span
                     className={`pill pill-${txnStatusPillMod(t.approved !== false)}`}

@@ -43,7 +43,6 @@ export function TransactionsPage() {
       list = list.filter((t) => {
         const payee = resolvePayee(data, t).toLowerCase();
         const cat = resolveCategory(data, t.categoryId, t).toLowerCase();
-        const memo = (t.memo || '').toLowerCase();
         const acctObj = data.accounts.find((a) => a.ynabId === t.accountId);
         const acct = resolveAccountName(acctObj).toLowerCase();
         const acctYnab = (acctObj?.name || '').toLowerCase();
@@ -52,7 +51,6 @@ export function TransactionsPage() {
         return (
           payee.includes(needle) ||
           cat.includes(needle) ||
-          memo.includes(needle) ||
           acct.includes(needle) ||
           acctYnab.includes(needle) ||
           acctAlias.includes(needle) ||
@@ -110,7 +108,7 @@ export function TransactionsPage() {
       <div className="toolbar wrap">
         <input
           className="input search"
-          placeholder="Search payee, category, memo, account…"
+          placeholder="Search payee, category, account…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -168,6 +166,7 @@ export function TransactionsPage() {
         data={data}
         rows={pageRows}
         showAccount
+        showMemo={false}
         onCategorize={setTarget}
         footNote={
           total === 0

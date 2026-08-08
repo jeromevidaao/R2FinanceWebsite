@@ -886,6 +886,19 @@ select {
 .txn-table:not(.txn-table--with-account) .txn-col-category {
   width: 18%;
 }
+/* All-transactions: no memo — payee/category take the freed width */
+.txn-table.txn-table--no-memo .txn-col-payee {
+  width: 22%;
+}
+.txn-table.txn-table--no-memo .txn-col-category {
+  width: 20%;
+}
+.txn-table.txn-table--no-memo.txn-table--with-account {
+  min-width: 900px;
+}
+.txn-table.txn-table--no-memo.txn-table--with-account.txn-table--with-actions {
+  min-width: 1000px;
+}
 
 .txn-table th,
 .txn-table td {
