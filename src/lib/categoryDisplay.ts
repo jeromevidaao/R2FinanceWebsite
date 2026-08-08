@@ -245,7 +245,7 @@ export function categoryChipForCategory(
   };
 }
 
-/** Stable group key for Spending list (same category together). */
+/** Stable group key for category-based inbox (legacy / tests). */
 export function inboxGroupKey(t: Transaction): string {
   if (t.transferAccountId) return `__transfer:${t.transferAccountId}`;
   if (!t.categoryId) return '__needed';
@@ -267,6 +267,25 @@ export type InboxCategoryGroup = {
   pairCount?: number;
 };
 
+/** One row inside a date group (per-txn category rail + optional sister flags). */
+export type InboxDateRow = {
+  transaction: Transaction;
+  chip: CategoryChip;
+  railColor: string;
+  /** Part of a sister (transfer / offsetting) pair. */
+  sisterPair: boolean;
+  sisterStart: boolean;
+  sisterEnd: boolean;
+};
+
+/** Inbox section: one calendar day, newest first. */
+export type InboxDateGroup = {
+  key: string;
+  /** YYYY-MM-DD */
+  date: string;
+  items: InboxDateRow[];
+};
+
 const SISTERS_KEY = '__sisters';
 
 function sisterPairsChip(pairCount: number): CategoryChip {
@@ -282,10 +301,92 @@ function sisterPairsChip(pairCount: number): CategoryChip {
 }
 
 /**
- * Group unapproved/inbox rows for bulk approve.
- * Order: Sister pairs (cancel out) → Category Needed → named categories (A–Z) → transfers.
- * Within each category group: newest date first.
- * Sister group: pairs listed consecutively (outflow then inflow).
+ * Group unapproved/inbox rows by calendar date (newest first).
+ * Still merges sister pairs (transfer legs / equal-opposite amounts) and
+ * lists each pair consecutively under the later of the two dates.
+ * Category chip + rail colors stay per row (UI from category grouping).
+ */
+export function groupInboxByDate(
+  data: LedgerData,
+  items: Transaction[],
+): InboxDateGroup[] {
+  const { pairs, unpaired } = findSisterPairs(items);
+
+  type Bucket = {
+    pairs: ReturnType<typeof findSisterPairs>['pairs'];
+    unpaired: Transaction[];
+  };
+  const buckets = new Map<string, Bucket>();
+
+  function bucket(date: string): Bucket {
+    const key = (date || '').slice(0, 10) || 'unknown';
+    let b = buckets.get(key);
+    if (!b) {
+      b = { pairs: [], unpaired: [] };
+      buckets.set(key, b);
+    }
+    return b;
+  }
+
+  for (const p of pairs) {
+    // Place pair under the later date so both legs stay together by day.
+    const d = p.a.date >= p.b.date ? p.a.date : p.b.date;
+    bucket(d).pairs.push(p);
+  }
+  for (const t of unpaired) {
+    bucket(t.date).unpaired.push(t);
+  }
+
+  const dates = [...buckets.keys()].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
+
+  return dates.map((date) => {
+    const b = buckets.get(date)!;
+    const itemsOut: InboxDateRow[] = [];
+
+    // Sister pairs first within the day (newest pairs already sorted globally).
+    for (const p of b.pairs) {
+      for (const [t, start, end] of [
+        [p.a, true, false] as const,
+        [p.b, false, true] as const,
+      ]) {
+        const chip = categoryChipForTxn(data, t);
+        itemsOut.push({
+          transaction: t,
+          chip,
+          railColor: SISTER_COLOR,
+          sisterPair: true,
+          sisterStart: start,
+          sisterEnd: end,
+        });
+      }
+    }
+
+    const sortedUnpaired = [...b.unpaired].sort((a, b2) => {
+      // Same day: larger absolute amount first, then payee-stable by id.
+      const aa = Math.abs(a.amount);
+      const ab = Math.abs(b2.amount);
+      if (aa !== ab) return ab - aa;
+      return (a.ynabId || a.id || '').localeCompare(b2.ynabId || b2.id || '');
+    });
+    for (const t of sortedUnpaired) {
+      const chip = categoryChipForTxn(data, t);
+      itemsOut.push({
+        transaction: t,
+        chip,
+        railColor: chip.railColor,
+        sisterPair: false,
+        sisterStart: false,
+        sisterEnd: false,
+      });
+    }
+
+    return { key: date, date, items: itemsOut };
+  });
+}
+
+/**
+ * Legacy: group by category (Sister pairs → Needed → A–Z → transfers).
+ * Prefer [groupInboxByDate] for Categorization UI.
  */
 export function groupInboxByCategory(
   data: LedgerData,

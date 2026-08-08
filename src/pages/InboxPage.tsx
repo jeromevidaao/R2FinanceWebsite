@@ -15,12 +15,8 @@ import { formatFriendlyDate } from '../lib/relativeDate';
 import { ledgerApi } from '../api/client';
 import {
   categoryChipForTxn,
-  groupInboxByCategory,
+  groupInboxByDate,
 } from '../lib/categoryDisplay';
-import {
-  isSisterPairEnd,
-  isSisterPairStart,
-} from '../lib/sisterPairs';
 import {
   formatTxnStatus,
   isInboxTxn,
@@ -49,15 +45,16 @@ export function InboxPage() {
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   }, [data]);
 
-  const categoryGroups = useMemo(() => {
+  const dateGroups = useMemo(() => {
     if (!data) return [];
-    return groupInboxByCategory(data, items);
+    return groupInboxByDate(data, items);
   }, [data, items]);
 
-  /** Flat ynabIds in on-screen order (groups top→bottom, rows top→bottom). */
+  /** Flat ynabIds in on-screen order (date groups top→bottom, rows top→bottom). */
   const orderedIds = useMemo(
-    () => categoryGroups.flatMap((g) => g.transactions.map((t) => t.ynabId)),
-    [categoryGroups],
+    () =>
+      dateGroups.flatMap((g) => g.items.map((row) => row.transaction.ynabId)),
+    [dateGroups],
   );
 
   // Drop selections that left the inbox.
@@ -226,8 +223,8 @@ export function InboxPage() {
               </>
             ) : (
               <>
-                Sister pairs (cancel out) · grouped by category · Shift+click
-                for range select · approve works without a category
+                By date · sister pairs still merged · Shift+click for range
+                select · approve works without a category
               </>
             )}
           </p>
@@ -272,8 +269,8 @@ export function InboxPage() {
         </div>
       ) : (
         <div className="panel inbox-panel">
-          {categoryGroups.map((group) => {
-            const groupIds = group.transactions.map((t) => t.ynabId);
+          {dateGroups.map((group) => {
+            const groupIds = group.items.map((row) => row.transaction.ynabId);
             const selectedInGroup = groupIds.filter((id) =>
               selectedLive.has(id),
             ).length;
@@ -282,14 +279,11 @@ export function InboxPage() {
             return (
               <section key={group.key} className="inbox-cat-group">
                 <header className="inbox-cat-header">
-                  <span
-                    className="inbox-cat-swatch"
-                    style={{ background: group.railColor }}
-                    aria-hidden
-                  />
-                  <CategoryChip chip={group.chip} />
+                  <span className="inbox-date-label">
+                    {formatFriendlyDate(group.date)}
+                  </span>
                   <span className="muted small">
-                    {group.transactions.length}
+                    {group.items.length}
                     {selectedInGroup > 0 && selectedInGroup < groupIds.length
                       ? ` · ${selectedInGroup} selected`
                       : ''}
@@ -303,16 +297,14 @@ export function InboxPage() {
                   </button>
                 </header>
                 <ul className="inbox-list inbox-list--railed">
-                  {group.transactions.map((t, idx) => {
+                  {group.items.map((row, idx) => {
+                    const t = row.transaction;
                     const acct = data.accounts.find(
                       (a) => a.ynabId === t.accountId,
                     );
                     const isSel = selectedLive.has(t.ynabId);
                     const isFirst = idx === 0;
-                    const isLast = idx === group.transactions.length - 1;
-                    const isSister = !!group.sisterPairs;
-                    const pairStart = isSister && isSisterPairStart(idx);
-                    const pairEnd = isSister && isSisterPairEnd(idx);
+                    const isLast = idx === group.items.length - 1;
                     return (
                       <li
                         key={t.ynabId}
@@ -322,15 +314,15 @@ export function InboxPage() {
                           isSel ? 'is-selected' : '',
                           isFirst ? 'is-group-first' : '',
                           isLast ? 'is-group-last' : '',
-                          isSister ? 'inbox-row--sister' : '',
-                          pairStart ? 'is-sister-start' : '',
-                          pairEnd ? 'is-sister-end' : '',
+                          row.sisterPair ? 'inbox-row--sister' : '',
+                          row.sisterStart ? 'is-sister-start' : '',
+                          row.sisterEnd ? 'is-sister-end' : '',
                         ]
                           .filter(Boolean)
                           .join(' ')}
                         style={
                           {
-                            '--rail-color': group.railColor,
+                            '--rail-color': row.railColor,
                           } as CSSProperties
                         }
                       >
@@ -362,7 +354,7 @@ export function InboxPage() {
                           <div className="inbox-main">
                             <div className="row-title">
                               {resolvePayee(data, t)}
-                              {pairEnd && (
+                              {row.sisterEnd && (
                                 <span className="sister-badge muted small">
                                   {' '}
                                   · cancels pair
@@ -370,8 +362,8 @@ export function InboxPage() {
                               )}
                             </div>
                             <div className="inbox-meta">
+                              <CategoryChip chip={row.chip} />
                               <span className="muted small">
-                                {formatFriendlyDate(t.date)} ·{' '}
                                 {resolveAccountName(acct)} ·{' '}
                                 {formatTxnStatus(t.approved !== false)}
                                 {t.locationDisplay

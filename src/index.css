@@ -520,7 +520,7 @@ select {
   letter-spacing: 0.02em;
 }
 
-/* Category groups with YNAB-style left color rail */
+/* Date groups with YNAB-style left color rail (per-row category color) */
 .inbox-cat-group {
   margin-bottom: 18px;
 }
@@ -530,6 +530,11 @@ select {
   gap: 10px;
   padding: 6px 4px 8px;
   flex-wrap: wrap;
+}
+.inbox-date-label {
+  font-weight: 650;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
 }
 .inbox-cat-swatch {
   width: 10px;
