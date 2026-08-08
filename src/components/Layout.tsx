@@ -13,7 +13,7 @@ const primaryNav = [
 ];
 
 const secondaryNav = [
-  { to: '/transactions', label: 'All' },
+  { to: '/transactions', label: 'Transactions' },
   { to: '/categories', label: 'Categories' },
   { to: '/payees', label: 'Payees' },
   { to: '/connectors', label: 'Connectors' },
