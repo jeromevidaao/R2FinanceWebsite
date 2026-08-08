@@ -153,6 +153,10 @@ select {
   margin: 0 auto;
   padding: 28px 28px 64px;
 }
+/* Full-ledger views (all transactions): use more of the viewport so columns can breathe */
+.page.page--ledger {
+  max-width: min(1680px, calc(100vw - 24px));
+}
 
 .page-header {
   display: flex;
@@ -688,37 +692,110 @@ select {
 .table-wrap {
   overflow: auto;
   padding: 0;
+  /* Let wide ledgers scroll instead of crushing text columns */
+  -webkit-overflow-scrolling: touch;
 }
 .txn-table {
   width: 100%;
+  min-width: 720px;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.92rem;
 }
+/* Account column (all-transactions) needs more horizontal room */
+.txn-table.txn-table--with-account {
+  min-width: 980px;
+}
+.txn-table.txn-table--with-actions {
+  min-width: 860px;
+}
+.txn-table.txn-table--with-account.txn-table--with-actions {
+  min-width: 1080px;
+}
+
+/* Dynamic column budget: fixed fields stay tight; text fields share the rest */
+.txn-table .txn-col-date {
+  width: 6.75rem;
+}
+.txn-table .txn-col-account {
+  width: 12%;
+}
+.txn-table .txn-col-payee {
+  width: 16%;
+}
+.txn-table .txn-col-category {
+  width: 15%;
+}
+.txn-table .txn-col-memo {
+  width: auto; /* absorbs remaining width for best memo visibility */
+}
+.txn-table .txn-col-status {
+  width: 6.5rem;
+}
+.txn-table .txn-col-amount {
+  width: 7.25rem;
+}
+.txn-table .txn-col-actions {
+  width: 8.25rem;
+}
+/* Without account column, give payee/category a bit more room */
+.txn-table:not(.txn-table--with-account) .txn-col-payee {
+  width: 20%;
+}
+.txn-table:not(.txn-table--with-account) .txn-col-category {
+  width: 18%;
+}
+
 .txn-table th,
 .txn-table td {
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
+  /* Enable ellipsis inside fixed layout */
+  overflow: hidden;
 }
 .txn-table th {
   position: sticky;
   top: 0;
+  z-index: 1;
   background: #151c26;
   color: var(--muted);
   font-weight: 600;
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 .txn-table .num {
   text-align: right;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .txn-table .txn-actions-col {
   text-align: right;
   white-space: nowrap;
-  width: 1%;
+}
+/* Clip long text so flexible columns stay readable */
+.txn-table .txn-cell-clip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.txn-table .txn-cell-clip a {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.txn-table .txn-cell-fixed {
+  white-space: nowrap;
+}
+.txn-table .txn-cell-category {
+  overflow: hidden;
+}
+.txn-table .txn-cell-category .cat-chip {
+  max-width: 100%;
 }
 /* Clickable category cell — change category on register / all-txns */
 .txn-cat-btn {
@@ -735,6 +812,11 @@ select {
   font: inherit;
   cursor: pointer;
   text-align: left;
+  min-width: 0;
+}
+.txn-cat-btn .cat-chip {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 .txn-cat-btn:hover {
   border-color: rgba(96, 165, 250, 0.45);

@@ -125,19 +125,43 @@ export function TxnTable({
   /** Override default footer text (e.g. pagination range). */
   footNote?: string;
 }) {
+  const tableClass = [
+    'txn-table',
+    showAccount ? 'txn-table--with-account' : '',
+    onCategorize ? 'txn-table--with-actions' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <div className="table-wrap panel">
-      <table className="txn-table">
+      <table className={tableClass}>
+        <colgroup>
+          <col className="txn-col-date" />
+          {showAccount && <col className="txn-col-account" />}
+          <col className="txn-col-payee" />
+          <col className="txn-col-category" />
+          <col className="txn-col-memo" />
+          <col className="txn-col-status" />
+          <col className="txn-col-amount" />
+          {onCategorize && <col className="txn-col-actions" />}
+        </colgroup>
         <thead>
           <tr>
-            <th>Date</th>
-            {showAccount && <th>Account</th>}
-            <th>Payee</th>
-            <th>Category</th>
-            <th>Memo</th>
-            <th>Status</th>
-            <th className="num">Amount</th>
-            {onCategorize && <th className="txn-actions-col">Actions</th>}
+            <th scope="col">Date</th>
+            {showAccount && <th scope="col">Account</th>}
+            <th scope="col">Payee</th>
+            <th scope="col">Category</th>
+            <th scope="col">Memo</th>
+            <th scope="col">Status</th>
+            <th scope="col" className="num">
+              Amount
+            </th>
+            {onCategorize && (
+              <th scope="col" className="txn-actions-col">
+                Actions
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -153,22 +177,28 @@ export function TxnTable({
           )}
           {rows.map((t) => {
             const acct = data.accounts.find((a) => a.ynabId === t.accountId);
+            const payee = resolvePayee(data, t.payeeId);
+            const memo = t.memo || '';
             const canEditCategory = !!onCategorize && !t.transferAccountId;
             const chip = categoryChipForTxn(data, t);
             return (
               <tr key={t.ynabId}>
-                <td className="mono">{t.date}</td>
+                <td className="mono txn-cell-fixed">{t.date}</td>
                 {showAccount && (
-                  <td>
+                  <td className="txn-cell-clip" title={acct?.name || undefined}>
                     <Link to={`/accounts/${t.accountId}`}>
                       {acct?.name || '—'}
                     </Link>
                   </td>
                 )}
-                <td>{resolvePayee(data, t.payeeId)}</td>
+                <td className="txn-cell-clip" title={payee || undefined}>
+                  {payee}
+                </td>
                 <td
                   className={
-                    !t.categoryId && !t.transferAccountId ? 'warn' : undefined
+                    !t.categoryId && !t.transferAccountId
+                      ? 'warn txn-cell-category'
+                      : 'txn-cell-category'
                   }
                 >
                   {canEditCategory ? (
@@ -177,7 +207,7 @@ export function TxnTable({
                       className="txn-cat-btn"
                       title={
                         t.categoryId
-                          ? 'Change category (saves to cloud + YNAB)'
+                          ? `${chip.label} — change category (saves to cloud + YNAB)`
                           : 'Set category (saves to cloud + YNAB)'
                       }
                       onClick={() => onCategorize?.(t)}
@@ -191,8 +221,10 @@ export function TxnTable({
                     <CategoryChip chip={chip} />
                   )}
                 </td>
-                <td className="muted">{t.memo || ''}</td>
-                <td>
+                <td className="muted txn-cell-clip" title={memo || undefined}>
+                  {memo}
+                </td>
+                <td className="txn-cell-fixed">
                   <span
                     className={`pill pill-${txnStatusPillMod(t.approved !== false)}`}
                     title={
@@ -204,7 +236,7 @@ export function TxnTable({
                     {formatTxnStatus(t.approved !== false)}
                   </span>
                 </td>
-                <td className={`num mono ${moneyClass(t.amount)}`}>
+                <td className={`num mono txn-cell-fixed ${moneyClass(t.amount)}`}>
                   {formatMoney(t.amount, data.plan.currency || 'USD', {
                     sign: true,
                   })}

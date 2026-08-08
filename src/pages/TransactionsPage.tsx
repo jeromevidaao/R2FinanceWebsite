@@ -84,10 +84,10 @@ export function TransactionsPage() {
   const to = Math.min(safePage * pageSize, total);
 
   return (
-    <div className="page">
+    <div className="page page--ledger">
       <header className="page-header">
         <div>
-          <h1>All transactions</h1>
+          <h1>Transactions</h1>
           <p className="muted">
             {data.transactions.length.toLocaleString()} in ledger
             {total !== data.transactions.length
