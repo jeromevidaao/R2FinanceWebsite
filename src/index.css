@@ -644,6 +644,14 @@ select {
   gap: 8px;
   margin-top: 4px;
 }
+.maps-link {
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.maps-link:hover {
+  text-decoration: underline;
+}
 
 /* Category chips — Spending / categorize */
 .cat-chip {

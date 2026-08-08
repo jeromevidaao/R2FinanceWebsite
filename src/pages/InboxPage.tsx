@@ -4,6 +4,7 @@ import {
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from 'react';
 import { CategorizeModal } from '../components/CategorizeModal';
 import { CategoryChip } from '../components/CategoryChip';
@@ -29,6 +30,7 @@ import {
   resolvePayee,
 } from '../lib/dataStore';
 import type { Transaction } from '../api/types';
+import { mapsLinkForTxn } from '../lib/googleMaps';
 
 export function InboxPage() {
   const { data, loading, error, refresh } = useLedger();
@@ -377,6 +379,28 @@ export function InboxPage() {
                                   : t.plaidPfc
                                     ? ` · ${t.plaidPfc}`
                                     : ''}
+                                {(() => {
+                                  const maps = mapsLinkForTxn(
+                                    t,
+                                    resolvePayee(data, t),
+                                  );
+                                  if (!maps) return null;
+                                  return (
+                                    <>
+                                      {' · '}
+                                      <a
+                                        className="maps-link"
+                                        href={maps}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        title="Open place on Google Maps"
+                                      >
+                                        Maps
+                                      </a>
+                                    </>
+                                  );
+                                })()}
                               </span>
                             </div>
                             {t.memo && (
@@ -548,6 +572,41 @@ function TxnDetailModal({
               {resolveAccountName(acct)} · {formatFriendlyDate(txn.date)} ·{' '}
               {formatTxnStatus(txn.approved !== false)}
             </p>
+            {(() => {
+              const maps = mapsLinkForTxn(txn, payee);
+              const loc = txn.locationDisplay;
+              const pfc = txn.plaidPfc;
+              if (!loc && !pfc && !maps) return null;
+              const bits: ReactNode[] = [];
+              if (loc) bits.push(`📍 ${loc}`);
+              if (pfc) bits.push(pfc);
+              if (maps) {
+                bits.push(
+                  <a
+                    key="maps"
+                    className="maps-link"
+                    href={maps}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Google Maps
+                  </a>,
+                );
+              }
+              return (
+                <p
+                  className="muted small inbox-meta"
+                  title={txn.location?.text || undefined}
+                >
+                  {bits.map((b, i) => (
+                    <span key={i}>
+                      {i > 0 ? ' · ' : null}
+                      {b}
+                    </span>
+                  ))}
+                </p>
+              );
+            })()}
             <p className="muted small inbox-meta">
               Category:{' '}
               <CategoryChip chip={categoryChipForTxn(data, txn)} />

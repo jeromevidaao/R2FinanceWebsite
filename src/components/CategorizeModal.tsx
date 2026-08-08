@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { Category, CategoryGroup, Transaction } from '../api/types';
 import { CategoryChip } from './CategoryChip';
 import { categoryChipForCategory, categoryChipForTxn } from '../lib/categoryDisplay';
@@ -9,6 +9,7 @@ import {
   resolvePayee,
 } from '../lib/dataStore';
 import type { LedgerData } from '../lib/dataStore';
+import { mapsLinkForTxn } from '../lib/googleMaps';
 import { enqueueCategorize } from '../lib/pendingCategorize';
 
 export function CategorizeModal({
@@ -143,32 +144,83 @@ export function CategorizeModal({
                   ? `${resolvePayee(data, primary)} · ${formatFriendlyDate(primary.date)} · ${formatMoney(primary.amount)}`
                   : ''}
             </p>
-            {!bulk && primary && (primary.locationDisplay || primary.plaidPfc) && (
-              <p
-                className="muted small inbox-meta"
-                title={primary.location?.text || undefined}
-              >
-                {primary.locationDisplay ? `📍 ${primary.locationDisplay}` : null}
-                {primary.locationDisplay && primary.plaidPfc ? ' · ' : null}
-                {primary.plaidPfc || null}
-              </p>
-            )}
+            {!bulk &&
+              primary &&
+              (() => {
+                const payee = resolvePayee(data, primary);
+                const maps = mapsLinkForTxn(primary, payee);
+                const loc = primary.locationDisplay;
+                const pfc = primary.plaidPfc;
+                if (!loc && !pfc && !maps) return null;
+                const bits: ReactNode[] = [];
+                if (loc) bits.push(`📍 ${loc}`);
+                if (pfc) bits.push(pfc);
+                if (maps) {
+                  bits.push(
+                    <a
+                      key="maps"
+                      className="maps-link"
+                      href={maps}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Google Maps
+                    </a>,
+                  );
+                }
+                return (
+                  <p
+                    className="muted small inbox-meta"
+                    title={primary.location?.text || undefined}
+                  >
+                    {bits.map((b, i) => (
+                      <span key={i}>
+                        {i > 0 ? ' · ' : null}
+                        {b}
+                      </span>
+                    ))}
+                  </p>
+                );
+              })()}
             {bulk &&
               (() => {
-                const locs = [
-                  ...new Set(
-                    targets
-                      .map((t) => t.locationDisplay)
-                      .filter((s): s is string => !!s),
-                  ),
-                ];
-                if (!locs.length) return null;
+                const withPlace = targets.filter(
+                  (t) => t.locationDisplay || mapsLinkForTxn(t, resolvePayee(data, t)),
+                );
+                if (!withPlace.length) return null;
+                const shown = withPlace.slice(0, 3);
                 return (
                   <p className="muted small inbox-meta">
-                    📍{' '}
-                    {locs.length <= 3
-                      ? locs.join(' · ')
-                      : `${locs.slice(0, 2).join(' · ')} +${locs.length - 2} more`}
+                    {shown.map((t, i) => {
+                      const payee = resolvePayee(data, t);
+                      const maps = mapsLinkForTxn(t, payee);
+                      const label = t.locationDisplay
+                        ? `📍 ${t.locationDisplay}`
+                        : `📍 ${payee}`;
+                      return (
+                        <span key={t.ynabId}>
+                          {i > 0 ? ' · ' : null}
+                          {maps ? (
+                            <a
+                              className="maps-link"
+                              href={maps}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              title="Open place on Google Maps"
+                            >
+                              {label}
+                            </a>
+                          ) : (
+                            label
+                          )}
+                        </span>
+                      );
+                    })}
+                    {withPlace.length > 3
+                      ? ` +${withPlace.length - 3} more`
+                      : null}
                   </p>
                 );
               })()}
