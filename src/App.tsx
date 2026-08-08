@@ -20,11 +20,26 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return children;
 }
 
+/** Full page load of static privacy.html (not SPA shell). */
+function PrivacyRedirect() {
+  if (typeof window !== 'undefined') {
+    window.location.replace('/privacy.html');
+  }
+  return null;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      {/* Public legal: static file public/privacy.html (Amazon LWA consent URL) */}
+      <Route
+        path="/privacy"
+        element={
+          <PrivacyRedirect />
+        }
+      />
       <Route
         path="/"
         element={

@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f1419" />
+    <meta
+      name="description"
+      content="R2Finance Privacy Notice — how we handle account data and Amazon Login with Amazon / Data Portability authorizations."
+    />
+    <title>R2Finance — Privacy Notice</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0f1419;
+        --panel: #171d25;
+        --border: #2a3544;
+        --text: #e8eef6;
+        --muted: #8b9bb0;
+        --primary: #3dcc91;
+        --accent: #6c8cff;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Inter, 'Segoe UI', system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 40px 20px 80px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 28px;
+      }
+      .mark {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        color: #0a0f14;
+      }
+      h1 {
+        font-size: 1.75rem;
+        margin: 0 0 8px;
+        letter-spacing: -0.02em;
+      }
+      .meta {
+        color: var(--muted);
+        font-size: 0.95rem;
+        margin-bottom: 28px;
+      }
+      h2 {
+        font-size: 1.1rem;
+        margin: 28px 0 10px;
+        color: var(--primary);
+      }
+      p,
+      li {
+        color: var(--text);
+        margin: 0 0 12px;
+      }
+      ul {
+        padding-left: 1.25rem;
+        margin: 0 0 12px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px 22px;
+        margin: 16px 0 24px;
+      }
+      a {
+        color: var(--accent);
+      }
+      footer {
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <div class="brand">
+        <div class="mark">R2</div>
+        <div>
+          <strong>R2Finance</strong><br />
+          <span style="color: var(--muted); font-size: 0.9rem"
+            >finance.i-liquid.be</span
+          >
+        </div>
+      </div>
+
+      <h1>Privacy Notice</h1>
+      <p class="meta">
+        Effective date: August 8, 2026 · Consent Privacy Notice for Login with
+        Amazon / Amazon Data Portability
+      </p>
+
+      <div class="card">
+        <p style="margin: 0">
+          <strong>R2Finance</strong> is a private household finance application
+          operated for personal use by the household that controls this site
+          (<a href="https://finance.i-liquid.be/">https://finance.i-liquid.be</a
+          >). It is not a public consumer product that sells or brokers customer
+          data.
+        </p>
+      </div>
+
+      <h2>1. Who we are</h2>
+      <p>
+        R2Finance (“we”, “us”) provides a multi-account ledger and categorization
+        tools for our household. Contact for privacy questions:
+        <a href="mailto:jerome.ans@gmail.com">jerome.ans@gmail.com</a>.
+      </p>
+
+      <h2>2. What this notice covers</h2>
+      <p>
+        This notice explains how we handle information when you use R2Finance,
+        and when you authorize Amazon to share data with R2Finance through
+        <strong>Login with Amazon</strong> and
+        <strong>Amazon Data Portability</strong> (for example physical order
+        history).
+      </p>
+
+      <h2>3. Information we process</h2>
+      <ul>
+        <li>
+          <strong>Account credentials for R2Finance</strong> — email and
+          password (and multi-factor authentication where enabled) for household
+          members we allow to sign in.
+        </li>
+        <li>
+          <strong>Financial ledger data</strong> — accounts, transactions,
+          categories, payees, and related sync metadata stored in our AWS-hosted
+          backend (for example DynamoDB).
+        </li>
+        <li>
+          <strong>Bank connection metadata</strong> — when you link a bank via
+          Plaid, we store connection status and tokens needed for access; we do
+          not sell bank credentials.
+        </li>
+        <li>
+          <strong>Amazon data you authorize</strong> — if you consent via Login
+          with Amazon / Data Portability, we may receive order-related fields
+          such as product names, ASINs, quantities, order identifiers, order
+          dates, and amounts, solely to match and enrich
+          <em>your</em> existing Amazon card/marketplace charges in the R2Finance
+          ledger.
+        </li>
+      </ul>
+
+      <h2>4. How we use Amazon-authorized data</h2>
+      <ul>
+        <li>
+          Match bank or card transactions (for example descriptors like
+          <code>AMAZON MKTPL*</code>) to Amazon order line items.
+        </li>
+        <li>
+          Show product titles and related order details inside R2Finance for
+          household budgeting and categorization.
+        </li>
+        <li>We do <strong>not</strong> sell this data.</li>
+        <li>
+          We do <strong>not</strong> use it for advertising or third-party
+          marketing.
+        </li>
+        <li>
+          We do <strong>not</strong> share it with unrelated third parties except
+          as needed to run our infrastructure (AWS) or as required by law.
+        </li>
+      </ul>
+
+      <h2>5. Storage and security</h2>
+      <p>
+        Data is hosted on <strong>Amazon Web Services (AWS)</strong>, primarily
+        in the <strong>us-east-1</strong> region. Secrets (API keys, OAuth
+        tokens, connection credentials) are stored in AWS Systems Manager
+        Parameter Store and/or AWS Secrets Manager as SecureString values, not
+        in public source control. Access to the live application is restricted
+        to allowed household accounts.
+      </p>
+
+      <h2>6. Retention</h2>
+      <p>
+        Ledger and enrichment data are retained while we operate R2Finance for
+        household bookkeeping. Amazon authorization tokens can be revoked by
+        you in your Amazon account settings; we will stop using new Amazon data
+        after revocation and may delete cached Amazon-derived fields on request.
+      </p>
+
+      <h2>7. Your choices</h2>
+      <ul>
+        <li>
+          You may decline Login with Amazon / Data Portability consent; R2Finance
+          will continue to work without Amazon order enrichment.
+        </li>
+        <li>
+          You may revoke Amazon access at any time through your Amazon account’s
+          third-party application settings.
+        </li>
+        <li>
+          Household users may request deletion of R2Finance account data by
+          contacting us at the email above.
+        </li>
+      </ul>
+
+      <h2>8. Children</h2>
+      <p>
+        R2Finance is not directed at children under 13. We do not knowingly
+        collect personal information from children.
+      </p>
+
+      <h2>9. Changes</h2>
+      <p>
+        We may update this notice as the product evolves. The effective date at
+        the top will change when we do. Continued use of R2Finance after an
+        update constitutes acceptance of the revised notice for this household
+        application.
+      </p>
+
+      <h2>10. Contact</h2>
+      <p>
+        Questions about this Privacy Notice or Amazon data handling:<br />
+        <a href="mailto:jerome.ans@gmail.com">jerome.ans@gmail.com</a><br />
+        Site:
+        <a href="https://finance.i-liquid.be/">https://finance.i-liquid.be</a>
+      </p>
+
+      <footer>
+        R2Finance · Consent Privacy Notice ·
+        <a href="https://finance.i-liquid.be/privacy.html"
+          >https://finance.i-liquid.be/privacy.html</a
+        >
+      </footer>
+    </main>
+  </body>
+</html>
