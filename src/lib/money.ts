@@ -20,6 +20,17 @@ export function formatMoney(
   return abs;
 }
 
+/**
+ * Absolute currency for "Total spending" (YNAB Reflect / Android formatSpend).
+ * Always positive so Android, website, and YNAB show the same figure.
+ */
+export function formatSpend(
+  milli: number,
+  currency = 'USD',
+): string {
+  return formatMoney(Math.abs(milli), currency);
+}
+
 export function moneyClass(milli: number): string {
   if (milli > 0) return 'amt-pos';
   if (milli < 0) return 'amt-neg';

@@ -14,7 +14,7 @@ import {
   SPENDING_COLOR,
   buildStackSegments,
 } from '../lib/categoryColors';
-import { formatMoney, formatMonth, moneyClass } from '../lib/money';
+import { formatMoney, formatMonth, formatSpend, moneyClass } from '../lib/money';
 
 export function ReportsPage() {
   const { data, loading, error, refresh } = useLedger();
@@ -120,7 +120,7 @@ export function ReportsPage() {
           </div>
 
           <div className="reflect-total mono">
-            {formatMoney(report.outflow)}
+            {formatSpend(report.outflow)}
           </div>
           <p className="muted small" style={{ marginTop: 0 }}>
             Total spending

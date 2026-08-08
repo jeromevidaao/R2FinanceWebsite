@@ -15,7 +15,7 @@ import {
   buildStackSegments,
   colorForCategoryId,
 } from '../lib/categoryColors';
-import { formatMoney, formatMonth, moneyClass } from '../lib/money';
+import { formatMoney, formatMonth, formatSpend, moneyClass } from '../lib/money';
 
 type ViewMode = 'month' | 'presets';
 
@@ -137,8 +137,8 @@ export function SpendingBreakdownPage() {
 
       <section className="panel">
         <div className="stat-label">Total Spending</div>
-        <div className={`reflect-total mono ${moneyClass(report.outflow)}`}>
-          {formatMoney(report.outflow)}
+        <div className="reflect-total mono">
+          {formatSpend(report.outflow)}
         </div>
 
         {stack.segments.length > 0 && (

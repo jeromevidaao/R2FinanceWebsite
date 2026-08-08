@@ -285,12 +285,19 @@ export function buildSpendingReport(opts: {
       payeeId: string | null | undefined;
     };
 
-    // Prefer non-transfer split legs. If every split is a transfer, attribute
-    // nothing (do not fall back to parent amount — that counted transfers as spend).
-    // Incomplete zero-amount non-transfer legs still fall back to parent.
-    const transferSubsOnly =
-      hasSplits && nonTransferSubs.length === 0 && t.subtransactions!.length > 0;
-    const lines: Line[] = transferSubsOnly
+    // Prefer non-transfer split legs. Pure transfer split (all legs transfer +
+    // amounts equal parent) → attribute nothing. Orphan transfer-only legs that
+    // do not reconcile to the parent → use parent (stale/partial split data).
+    const transferSubs = hasSplits
+      ? t.subtransactions!.filter((s) => !!s.transferAccountId)
+      : [];
+    const transferLegsSum = transferSubs.reduce((s, x) => s + x.amount, 0);
+    const pureTransferSplit =
+      hasSplits &&
+      nonTransferSubs.length === 0 &&
+      transferSubs.length > 0 &&
+      transferLegsSum === t.amount;
+    const lines: Line[] = pureTransferSplit
       ? []
       : hasSplits && nonTransferSubs.some((s) => s.amount !== 0)
         ? nonTransferSubs.map((s) => ({
@@ -298,23 +305,13 @@ export function buildSpendingReport(opts: {
             categoryId: s.categoryId ?? t.categoryId,
             payeeId: s.payeeId ?? t.payeeId,
           }))
-        : hasSplits &&
-            nonTransferSubs.length > 0 &&
-            nonTransferSubs.every((s) => s.amount === 0)
-          ? [
-              {
-                amount: t.amount,
-                categoryId: t.categoryId,
-                payeeId: t.payeeId,
-              },
-            ]
-          : [
-              {
-                amount: t.amount,
-                categoryId: t.categoryId,
-                payeeId: t.payeeId,
-              },
-            ];
+        : [
+            {
+              amount: t.amount,
+              categoryId: t.categoryId,
+              payeeId: t.payeeId,
+            },
+          ];
 
     if (lines.length === 0) continue;
 
