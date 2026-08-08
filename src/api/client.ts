@@ -130,13 +130,57 @@ export const ledgerApi = {
   /**
    * Local-first snapshot: full when since=0 / full=1, else rows changed after cursor.
    * Includes deleted tombstones in delta mode.
+   * Transactions may be paged (`txnOffset` / `hasMore`) — use syncChangesAll for a full merge.
    */
-  syncChanges: (since = 0, full = false) => {
-    const q =
-      full || since <= 0
-        ? '/v1/sync/changes?full=1'
-        : `/v1/sync/changes?since=${encodeURIComponent(String(since))}`;
-    return get<SyncChanges>(q);
+  syncChanges: (since = 0, full = false, txnOffset = 0) => {
+    const params = new URLSearchParams();
+    if (full || since <= 0) params.set('full', '1');
+    else params.set('since', String(since));
+    if (txnOffset > 0) params.set('txnOffset', String(txnOffset));
+    return get<SyncChanges>(`/v1/sync/changes?${params.toString()}`);
+  },
+  /**
+   * Fetch all pages of /v1/sync/changes and merge into one pack.
+   * Required for full snapshots (~7k+ txns) which exceed the Lambda 6MB limit in one shot.
+   */
+  syncChangesAll: async (since = 0, full = false): Promise<SyncChanges> => {
+    let txnOffset = 0;
+    let first: SyncChanges | null = null;
+    const transactions: SyncChanges['transactions'] = [];
+    // Safety cap: 40 pages × 2500 = 100k rows (way above current ledger).
+    for (let page = 0; page < 40; page++) {
+      const pack = await ledgerApi.syncChanges(since, full, txnOffset);
+      if (!first) first = pack;
+      transactions.push(...(pack.transactions || []));
+      if (!pack.hasMore) {
+        return {
+          ...first,
+          ...pack,
+          // Meta lives on page 0; keep first-page entities.
+          plan: first.plan || pack.plan,
+          accounts: first.accounts?.length ? first.accounts : pack.accounts || [],
+          groups: first.groups?.length ? first.groups : pack.groups || [],
+          categories: first.categories?.length
+            ? first.categories
+            : pack.categories || [],
+          payees: first.payees?.length ? first.payees : pack.payees || [],
+          transactions,
+          hasMore: false,
+          txnOffset: 0,
+          nextTxnOffset: transactions.length,
+          txnTotal: pack.txnTotal ?? transactions.length,
+          cursor: pack.cursor || pack.serverTime,
+          counts: {
+            ...(first.counts || {}),
+            ...(pack.counts || {}),
+            transactions: transactions.length,
+            txnTotal: pack.txnTotal ?? transactions.length,
+          },
+        };
+      }
+      txnOffset = pack.nextTxnOffset ?? transactions.length;
+    }
+    throw new Error('sync/changes pagination exceeded max pages');
   },
   categorize: (ynabTxnId: string, categoryYnabId: string, push = true) =>
     post<CategorizeResult>('/v1/transactions/categorize', {

@@ -146,7 +146,11 @@ function applyDelta(base: LedgerData, pack: SyncChanges): LedgerData {
 
 function fromFullPack(pack: SyncChanges, stats: Stats | null): LedgerData {
   return {
-    plan: pack.plan,
+    plan: pack.plan || {
+      name: 'Plan',
+      currency: 'USD',
+      serverKnowledge: 0,
+    },
     stats,
     accounts: (pack.accounts || [])
       .filter((a) => !a.deleted && !a.closed)
@@ -236,8 +240,9 @@ export async function loadLedger(
       !lastFullAt ||
       now - lastFullAt >= FULL_SYNC_INTERVAL_MS;
 
-    // 2) Network: one lightweight changes call (or full when empty / interval).
-    const pack = await ledgerApi.syncChanges(fullDue ? 0 : cursor, fullDue);
+    // 2) Network: paged changes call (full when empty / interval). Multi-page
+    // merges keep us under the Lambda 6MB response limit (~7k+ txns).
+    const pack = await ledgerApi.syncChangesAll(fullDue ? 0 : cursor, fullDue);
     const stats = await ledgerApi.stats().catch(() => cache?.stats ?? null);
 
     let next: LedgerData;

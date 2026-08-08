@@ -106,18 +106,26 @@ export interface SyncChanges {
   serverTime: number;
   cursor: number;
   since: number;
-  plan: Plan;
+  /** Present on first page only when paged. */
+  plan: Plan | null;
   accounts: Array<Account & { deleted?: boolean; updatedAt?: number }>;
   groups: Array<CategoryGroup & { deleted?: boolean; updatedAt?: number }>;
   categories: Array<Category & { deleted?: boolean; updatedAt?: number }>;
   payees: Array<Payee & { deleted?: boolean; updatedAt?: number }>;
   transactions: Transaction[];
+  /** True when more transaction pages remain — do not advance local cursor yet. */
+  hasMore?: boolean;
+  txnOffset?: number;
+  nextTxnOffset?: number;
+  txnLimit?: number;
+  txnTotal?: number;
   counts?: {
     accounts: number;
     groups: number;
     categories: number;
     payees: number;
     transactions: number;
+    txnTotal?: number;
   };
 }
 
