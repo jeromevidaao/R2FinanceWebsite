@@ -29,10 +29,13 @@ export interface PendingCategorize {
 
 type Listener = () => void;
 type ErrorListener = (message: string) => void;
+type SuccessListener = (message: string) => void;
 
 const pending = new Map<string, PendingCategorize & { timer: ReturnType<typeof setTimeout> }>();
 const listeners = new Set<Listener>();
 const errorListeners = new Set<ErrorListener>();
+const successListeners = new Set<SuccessListener>();
+let pageHideHooked = false;
 
 function notify() {
   listeners.forEach((fn) => fn());
@@ -40,6 +43,10 @@ function notify() {
 
 function notifyError(message: string) {
   errorListeners.forEach((fn) => fn(message));
+}
+
+function notifySuccess(message: string) {
+  successListeners.forEach((fn) => fn(message));
 }
 
 export function subscribePendingCategorize(fn: Listener): () => void {
@@ -50,6 +57,27 @@ export function subscribePendingCategorize(fn: Listener): () => void {
 export function subscribePendingCategorizeErrors(fn: ErrorListener): () => void {
   errorListeners.add(fn);
   return () => errorListeners.delete(fn);
+}
+
+export function subscribePendingCategorizeSuccess(
+  fn: SuccessListener,
+): () => void {
+  successListeners.add(fn);
+  return () => successListeners.delete(fn);
+}
+
+/** Ensure pending categorizes flush if the tab closes during the undo window. */
+function ensurePageHideFlush() {
+  if (pageHideHooked || typeof window === 'undefined') return;
+  pageHideHooked = true;
+  window.addEventListener('pagehide', () => {
+    void flushAllPendingCategorize();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      void flushAllPendingCategorize();
+    }
+  });
 }
 
 export function getPendingCategorizes(): PendingCategorize[] {
@@ -103,6 +131,8 @@ export function enqueueCategorize(opts: {
     patchTransactionCategoryMany(ynabIds, opts.categoryId);
   }
 
+  ensurePageHideFlush();
+
   const id = makeId();
   const entry: PendingCategorize & { timer: ReturnType<typeof setTimeout> } = {
     id,
@@ -119,6 +149,17 @@ export function enqueueCategorize(opts: {
   pending.set(id, entry);
   notify();
   return id;
+}
+
+/** Commit every pending categorize immediately (tab hide / page leave). */
+export async function flushAllPendingCategorize(): Promise<void> {
+  const ids = [...pending.keys()];
+  for (const id of ids) {
+    const entry = pending.get(id);
+    if (!entry) continue;
+    clearTimeout(entry.timer);
+    await commitPending(id);
+  }
 }
 
 function pushErrorMessage(push: {
@@ -141,6 +182,7 @@ async function commitPending(id: string): Promise<void> {
   notify();
 
   try {
+    let pushed = 0;
     for (const t of entry.snapshots) {
       // Writes category to DynamoDB (R2Finance), marks PENDING_PUSH, then
       // immediately pushes that row to the YNAB API.
@@ -152,7 +194,14 @@ async function commitPending(id: string): Promise<void> {
       const pushErr = pushErrorMessage(result.push);
       if (result.error) throw new Error(result.error);
       if (pushErr) throw new Error(pushErr);
+      pushed += Number(result.push?.pushed) || 0;
     }
+    const n = entry.ynabIds.length;
+    notifySuccess(
+      pushed > 0
+        ? `Saved + pushed to YNAB · ${entry.label}`
+        : `Saved in R2Finance · ${entry.label}${n > 1 ? ` (${n})` : ''} — YNAB may catch up on next tick`,
+    );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[categorize] delayed save failed', msg);

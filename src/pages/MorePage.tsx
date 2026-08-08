@@ -4,22 +4,33 @@ import { ErrorPanel, Loading } from '../components/Loading';
 import { useLedger } from '../hooks/useLedger';
 import {
   buildTxnInflux,
+  buildYnabOutbound,
   type InfluxDay,
   type InfluxSeries,
+  type OutboundDay,
+  type OutboundSeries,
 } from '../lib/txnInflux';
 
 /** Stacked bars: which API path brought the row into the ledger. */
 const YNAB_COLOR = '#6c8cff';
 const R2_COLOR = '#3dcc91';
+/** Outbound: successful writes from R2Finance → YNAB */
+const OUTBOUND_COLOR = '#f0a030';
+const PENDING_COLOR = '#e85d5d';
 
 export function MorePage() {
   const { data, loading, error, refresh } = useLedger();
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [hover, setHover] = useState<InfluxDay | null>(null);
+  const [outHover, setOutHover] = useState<OutboundDay | null>(null);
 
   const influx = useMemo(
     () => (data ? buildTxnInflux(data.transactions, { days: 90 }) : null),
+    [data],
+  );
+  const outbound = useMemo(
+    () => (data ? buildYnabOutbound(data.transactions, { days: 90 }) : null),
     [data],
   );
 
@@ -56,6 +67,14 @@ export function MorePage() {
           series={influx}
           hover={hover}
           onHover={setHover}
+        />
+      )}
+
+      {outbound && (
+        <YnabOutboundPanel
+          series={outbound}
+          hover={outHover}
+          onHover={setOutHover}
         />
       )}
 
@@ -184,8 +203,8 @@ export function MorePage() {
 }
 
 /**
- * 90-day histogram of *how many* ledger rows arrived per day, by API path
- * (YNAB bridge pull vs R2 device/app push). Counts only — no money.
+ * 90-day histogram of *how many* ledger rows arrived per day, by origin
+ * (YNAB pull vs R2-created). This is intake only — not category push to YNAB.
  */
 function TxnInfluxPanel({
   series,
@@ -228,7 +247,7 @@ function TxnInfluxPanel({
         <div>
           <h2>Transaction influx · 90 days</h2>
           <p className="muted small" style={{ margin: '4px 0 0' }}>
-            Daily API / ledger intake (counts only) · YNAB bridge vs R2 device ·{' '}
+            Where rows <strong>entered</strong> the ledger (not YNAB outbound) ·{' '}
             {formatShortRange(from, to)}
           </p>
         </div>
@@ -236,7 +255,7 @@ function TxnInfluxPanel({
 
       <div className="influx-stats">
         <div className="influx-stat">
-          <div className="stat-label">YNAB API</div>
+          <div className="stat-label">From YNAB</div>
           <div className="stat-value mono" style={{ color: YNAB_COLOR }}>
             {totals.ynabCount.toLocaleString()}
           </div>
@@ -245,7 +264,7 @@ function TxnInfluxPanel({
           </div>
         </div>
         <div className="influx-stat">
-          <div className="stat-label">R2 API</div>
+          <div className="stat-label">Created in R2</div>
           <div className="stat-value mono" style={{ color: R2_COLOR }}>
             {totals.r2Count.toLocaleString()}
           </div>
@@ -275,10 +294,10 @@ function TxnInfluxPanel({
 
       <div className="influx-legend">
         <span className="legend-item">
-          <i className="swatch" style={{ background: YNAB_COLOR }} /> YNAB pull
+          <i className="swatch" style={{ background: YNAB_COLOR }} /> From YNAB
         </span>
         <span className="legend-item">
-          <i className="swatch" style={{ background: R2_COLOR }} /> R2 device push
+          <i className="swatch" style={{ background: R2_COLOR }} /> Created in R2
         </span>
         {active && (
           <span className="influx-hover-chip mono small">
@@ -303,7 +322,7 @@ function TxnInfluxPanel({
               const c = b.r2Count;
               const hA = Math.max(a > 0 ? 3 : 0, (a / max) * 100);
               const hC = Math.max(c > 0 ? 3 : 0, (c / max) * 100);
-              const title = `${b.fullLabel}\nYNAB: ${b.ynabCount}\nR2Finance: ${b.r2Count}\n${b.totalCount} total`;
+              const title = `${b.fullLabel}\nFrom YNAB: ${b.ynabCount}\nCreated in R2: ${b.r2Count}\n${b.totalCount} total`;
 
               return (
                 <div
@@ -335,9 +354,162 @@ function TxnInfluxPanel({
       )}
 
       <p className="muted small" style={{ marginBottom: 0, marginTop: 12 }}>
-        Counts only — no amounts. <strong>YNAB</strong> = rows pulled through the
-        cloud bridge (no device <code>clientId</code>). <strong>R2</strong> = rows
-        created or edited via app / <code>/v1/device/push</code>.
+        Intake only. Categorizing a YNAB-imported row does <strong>not</strong>{' '}
+        move it into “Created in R2” — that stays under “From YNAB”. Use{' '}
+        <strong>Pushed to YNAB</strong> below for category/approve outbound.
+      </p>
+    </section>
+  );
+}
+
+/**
+ * Outbound bridge: successful writes R2Finance → YNAB (by lastPushedAt day).
+ * This is what you want after categorizing on the website.
+ */
+function YnabOutboundPanel({
+  series,
+  hover,
+  onHover,
+}: {
+  series: OutboundSeries;
+  hover: OutboundDay | null;
+  onHover: (d: OutboundDay | null) => void;
+}) {
+  const { totals, buckets, from, to } = series;
+  const mid = buckets[Math.floor(buckets.length / 2)];
+
+  const max = useMemo(() => {
+    let m = 1;
+    for (const b of buckets) m = Math.max(m, b.count);
+    return m;
+  }, [buckets]);
+
+  const peak = useMemo(() => {
+    let best: OutboundDay | null = null;
+    for (const b of buckets) {
+      if (!best || b.count > best.count) best = b;
+    }
+    return best && best.count > 0 ? best : null;
+  }, [buckets]);
+
+  return (
+    <section className="panel influx-panel">
+      <div className="panel-head influx-head">
+        <div>
+          <h2>Pushed to YNAB · 90 days</h2>
+          <p className="muted small" style={{ margin: '4px 0 0' }}>
+            Category / approve / create that landed in YNAB · by push day ·{' '}
+            {formatShortRange(from, to)}
+          </p>
+        </div>
+      </div>
+
+      <div className="influx-stats">
+        <div className="influx-stat">
+          <div className="stat-label">Pushed (90d)</div>
+          <div className="stat-value mono" style={{ color: OUTBOUND_COLOR }}>
+            {totals.pushedCount.toLocaleString()}
+          </div>
+          <div className="muted small mono" style={{ marginTop: 4 }}>
+            lastPushedAt in window
+          </div>
+        </div>
+        <div className="influx-stat">
+          <div className="stat-label">Pending queue</div>
+          <div
+            className="stat-value mono"
+            style={{
+              color: totals.pendingCount > 0 ? PENDING_COLOR : undefined,
+            }}
+          >
+            {totals.pendingCount.toLocaleString()}
+          </div>
+          <div className="muted small mono" style={{ marginTop: 4 }}>
+            waiting for YNAB
+          </div>
+        </div>
+        <div className="influx-stat">
+          <div className="stat-label">Ever pushed</div>
+          <div className="stat-value mono">
+            {totals.everPushedCount.toLocaleString()}
+          </div>
+          <div className="muted small mono" style={{ marginTop: 4 }}>
+            any age
+          </div>
+        </div>
+        <div className="influx-stat">
+          <div className="stat-label">Peak day</div>
+          <div className="stat-value mono">
+            {peak ? peak.count.toLocaleString() : '—'}
+          </div>
+          <div className="muted small mono" style={{ marginTop: 4 }}>
+            {peak ? peak.label : '—'}
+          </div>
+        </div>
+      </div>
+
+      <div className="influx-legend">
+        <span className="legend-item">
+          <i className="swatch" style={{ background: OUTBOUND_COLOR }} />{' '}
+          Successful push to YNAB
+        </span>
+        {hover && (
+          <span className="influx-hover-chip mono small">
+            {hover.fullLabel}
+            {` · ${hover.count} pushed`}
+          </span>
+        )}
+      </div>
+
+      {totals.pushedCount === 0 ? (
+        <p className="muted">
+          No stamped outbound pushes in this window yet. After you categorize
+          (wait ~10s for the undo bar, or leave the tab open until it commits),
+          reloads here should show a bar. Pending queue right now:{' '}
+          <strong className="mono">{totals.pendingCount}</strong>
+          {totals.pendingCount === 0
+            ? ' — nothing stuck; if YNAB didn’t update, the categorize API may not have been called (undo window cancelled or tab closed early).'
+            : ' — use “Server push from DDB” below to drain.'}
+        </p>
+      ) : (
+        <>
+          <div
+            className="hist-90"
+            role="img"
+            aria-label="Daily histogram of successful pushes from R2Finance to YNAB"
+            onMouseLeave={() => onHover(null)}
+          >
+            {buckets.map((b) => {
+              const h = Math.max(b.count > 0 ? 3 : 0, (b.count / max) * 100);
+              return (
+                <div
+                  key={b.key}
+                  className={`hist-col${hover?.key === b.key ? ' is-hover' : ''}`}
+                  title={`${b.fullLabel}\nPushed to YNAB: ${b.count}`}
+                  onMouseEnter={() => onHover(b)}
+                >
+                  <div className="hist-track">
+                    <div
+                      className="hist-bar"
+                      style={{ height: `${h}%`, background: OUTBOUND_COLOR }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="hist-axis">
+            <span>{buckets[0]?.label}</span>
+            <span>{mid?.label}</span>
+            <span>{buckets[buckets.length - 1]?.label}</span>
+          </div>
+        </>
+      )}
+
+      <p className="muted small" style={{ marginBottom: 0, marginTop: 12 }}>
+        Tracking starts when the backend stamps <code>lastPushedAt</code> on a
+        successful YNAB write (category, approve, or device create). Older
+        successful pushes before that stamp won’t appear.
       </p>
     </section>
   );

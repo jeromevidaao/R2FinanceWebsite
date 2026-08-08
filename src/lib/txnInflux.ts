@@ -198,3 +198,92 @@ export function buildTxnInflux(
 
   return { days, from, to, buckets, totals };
 }
+
+/** One calendar day of successful R2 → YNAB writes (lastPushedAt). */
+export type OutboundDay = {
+  key: string;
+  label: string;
+  fullLabel: string;
+  /** Rows whose last successful YNAB write fell on this day */
+  count: number;
+};
+
+export type OutboundSeries = {
+  days: number;
+  from: string;
+  to: string;
+  buckets: OutboundDay[];
+  totals: {
+    /** Successful YNAB writes in window (by lastPushedAt) */
+    pushedCount: number;
+    /** Currently waiting in DDB PENDING_PUSH queue */
+    pendingCount: number;
+    /** Rows with lastPushedAt ever (any age) */
+    everPushedCount: number;
+  };
+};
+
+/**
+ * Histogram of **outbound** YNAB sync (category / approve / device-create
+ * that landed in YNAB), keyed by `lastPushedAt` calendar day — not txn.date.
+ *
+ * Separate from intake (`buildTxnInflux`): categorizing a YNAB-imported row
+ * does **not** change its origin bar; it stamps lastPushedAt here instead.
+ */
+export function buildYnabOutbound(
+  transactions: Transaction[],
+  opts: { days?: number; now?: Date } = {},
+): OutboundSeries {
+  const days = Math.max(1, Math.min(366, opts.days ?? 90));
+  const now = opts.now ?? new Date();
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const start = new Date(end);
+  start.setDate(start.getDate() - (days - 1));
+
+  const from = ymdLocal(start);
+  const to = ymdLocal(end);
+
+  const buckets: OutboundDay[] = [];
+  const byKey = new Map<string, OutboundDay>();
+  for (let i = 0; i < days; i += 1) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const key = ymdLocal(d);
+    const b: OutboundDay = {
+      key,
+      label: formatShort(key),
+      fullLabel: formatFull(key),
+      count: 0,
+    };
+    buckets.push(b);
+    byKey.set(key, b);
+  }
+
+  let pushedCount = 0;
+  let pendingCount = 0;
+  let everPushedCount = 0;
+
+  for (const t of transactions) {
+    if (t.deleted) continue;
+    const status = (t.syncStatus || '').toUpperCase();
+    if (status === 'PENDING_PUSH') pendingCount += 1;
+
+    const lp = Number(t.lastPushedAt) || 0;
+    if (lp <= 0) continue;
+    everPushedCount += 1;
+    const day = ymdLocal(new Date(lp));
+    if (day < from || day > to) continue;
+    const b = byKey.get(day);
+    if (!b) continue;
+    b.count += 1;
+    pushedCount += 1;
+  }
+
+  return {
+    days,
+    from,
+    to,
+    buckets,
+    totals: { pushedCount, pendingCount, everPushedCount },
+  };
+}

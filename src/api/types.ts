@@ -81,6 +81,10 @@ export interface Transaction {
   /** Soft-delete tombstone from delta sync. */
   deleted?: boolean;
   updatedAt?: number;
+  /** DDB bridge status: PENDING_PUSH | SYNCED | … */
+  syncStatus?: string | null;
+  /** Epoch ms of last successful write to YNAB (category / approve / create). */
+  lastPushedAt?: number | null;
   subtransactions: SubTransaction[];
   /** Plaid match + location (from cloud enrich). */
   plaidTransactionId?: string | null;

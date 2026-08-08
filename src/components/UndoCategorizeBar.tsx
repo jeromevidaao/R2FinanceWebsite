@@ -4,6 +4,7 @@ import {
   pendingSecondsLeft,
   subscribePendingCategorize,
   subscribePendingCategorizeErrors,
+  subscribePendingCategorizeSuccess,
   undoCategorize,
   undoLatestCategorize,
   type PendingCategorize,
@@ -19,6 +20,7 @@ export function UndoCategorizeBar() {
   );
   const [showList, setShowList] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -29,7 +31,18 @@ export function UndoCategorizeBar() {
   }, []);
 
   useEffect(() => {
-    return subscribePendingCategorizeErrors((msg) => setError(msg));
+    return subscribePendingCategorizeErrors((msg) => {
+      setSuccess(null);
+      setError(msg);
+    });
+  }, []);
+
+  useEffect(() => {
+    return subscribePendingCategorizeSuccess((msg) => {
+      setError(null);
+      setSuccess(msg);
+      window.setTimeout(() => setSuccess(null), 6000);
+    });
   }, []);
 
   // Tick countdown while anything is pending.
@@ -43,7 +56,7 @@ export function UndoCategorizeBar() {
     if (items.length === 0) setShowList(false);
   }, [items.length]);
 
-  if (items.length === 0 && !error) return null;
+  if (items.length === 0 && !error && !success) return null;
 
   const latest = items[0];
   const multi = items.length > 1;
@@ -63,13 +76,25 @@ export function UndoCategorizeBar() {
           </button>
         </div>
       )}
+      {success && !error && (
+        <div className="undo-cat-bar undo-cat-bar--ok" role="status">
+          <span className="undo-cat-msg">{success}</span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => setSuccess(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       {items.length > 0 && latest && (
         <div className="undo-cat-bar" role="status">
           <span className="undo-cat-msg">
             {multi
               ? `${items.length} pending · ${latest.label}`
               : `Categorized · ${latest.label}`}
-            <span className="undo-cat-timer"> · {secs}s</span>
+            <span className="undo-cat-timer"> · YNAB in {secs}s</span>
           </span>
           <div className="undo-cat-actions">
             {multi && (
