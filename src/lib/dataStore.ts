@@ -17,6 +17,7 @@ import {
   saveSnapshot,
   type LedgerMeta,
 } from './ledgerPersist';
+import { resolveDisplayPayeeForTxn } from './displayPayee';
 
 export interface LedgerData {
   plan: Plan;
@@ -77,6 +78,8 @@ function applyDelta(base: LedgerData, pack: SyncChanges): LedgerData {
         closed: a.closed,
         note: a.note,
         transferPayeeId: a.transferPayeeId,
+        alias: a.alias ?? null,
+        mask: a.mask ?? extractAccountMask(a.name),
       });
     }
   }
@@ -163,6 +166,8 @@ function fromFullPack(pack: SyncChanges, stats: Stats | null): LedgerData {
         closed: a.closed,
         note: a.note,
         transferPayeeId: a.transferPayeeId,
+        alias: a.alias ?? null,
+        mask: a.mask ?? extractAccountMask(a.name),
       })),
     groups: (pack.groups || [])
       .filter((g) => !g.deleted)
@@ -315,6 +320,57 @@ export function accountMap(data: LedgerData): Map<string, Account> {
   return new Map(data.accounts.map((a) => [a.ynabId, a]));
 }
 
+/** Last-4 from a YNAB account name when it ends with digits. */
+export function extractAccountMask(name?: string | null): string | null {
+  const m = String(name || '').match(/(\d{4})\s*$/);
+  return m ? m[1] : null;
+}
+
+/**
+ * Display name for an account: user alias when set, else YNAB name.
+ * Use everywhere accounts appear (Categorization, filters, transfers).
+ */
+export function resolveAccountName(
+  account: Account | null | undefined,
+  fallback = 'Account',
+): string {
+  if (!account) return fallback;
+  const alias = account.alias?.trim();
+  return alias || account.name || fallback;
+}
+
+/** Resolve account id → display name from ledger data. */
+export function resolveAccount(
+  data: LedgerData,
+  accountId?: string | null,
+): string {
+  if (!accountId) return 'Account';
+  return resolveAccountName(accountMap(data).get(accountId));
+}
+
+/** Subtitle bits: type · ••••mask */
+export function accountIdentityLine(account: Account): string {
+  const parts: string[] = [];
+  if (account.type) parts.push(account.type);
+  const mask = account.mask || extractAccountMask(account.name);
+  if (mask) parts.push(`••••${mask}`);
+  return parts.join(' · ');
+}
+
+/** Patch one account in the local cache (after alias save). */
+export function patchAccountFields(
+  ynabId: string,
+  fields: Partial<Account>,
+): void {
+  if (!cache) return;
+  const accounts = cache.accounts.map((a) =>
+    a.ynabId === ynabId ? { ...a, ...fields } : a,
+  );
+  cache = { ...cache, accounts };
+  notify();
+  void saveSnapshot(cache);
+}
+
 export function categoryMap(data: LedgerData): Map<string, Category> {
   return new Map(data.categories.map((c) => [c.ynabId, c]));
 }
@@ -323,12 +379,36 @@ export function payeeMap(data: LedgerData): Map<string, Payee> {
   return new Map(data.payees.map((p) => [p.ynabId, p]));
 }
 
+/**
+ * Human payee for lists / categorize.
+ * Pass a payeeId (legacy) or a full Transaction so empty-payee bank imports
+ * can fall back to Plaid + credit-card payment formatting.
+ */
 export function resolvePayee(
   data: LedgerData,
-  payeeId?: string | null,
+  payeeIdOrTxn?: string | null | Transaction,
+  txnMaybe?: Transaction,
 ): string {
-  if (!payeeId) return '—';
-  return payeeMap(data).get(payeeId)?.name || 'Unknown payee';
+  let payeeId: string | null | undefined;
+  let txn: Transaction | undefined;
+  if (payeeIdOrTxn && typeof payeeIdOrTxn === 'object') {
+    txn = payeeIdOrTxn;
+    payeeId = txn.payeeId;
+  } else {
+    payeeId = payeeIdOrTxn ?? null;
+    txn = txnMaybe;
+  }
+
+  const named = payeeId ? payeeMap(data).get(payeeId)?.name : null;
+  if (named) return named;
+
+  if (txn) {
+    const display = resolveDisplayPayeeForTxn(txn, data.accounts, null);
+    if (display) return display;
+  }
+
+  if (payeeId) return 'Unknown payee';
+  return '—';
 }
 
 export function resolveCategory(
@@ -338,7 +418,7 @@ export function resolveCategory(
 ): string {
   if (txn?.transferAccountId) {
     const acct = accountMap(data).get(txn.transferAccountId);
-    return acct ? `Transfer: ${acct.name}` : 'Transfer';
+    return acct ? `Transfer: ${resolveAccountName(acct)}` : 'Transfer';
   }
   if (!categoryId) return 'Uncategorized';
   const cat = categoryMap(data).get(categoryId);
@@ -537,7 +617,7 @@ export function displayCategoryLabel(
 ): string {
   if (t.transferAccountId) {
     const acct = accountMap(data).get(t.transferAccountId);
-    return acct ? `Transfer: ${acct.name}` : 'Transfer';
+    return acct ? `Transfer: ${resolveAccountName(acct)}` : 'Transfer';
   }
   if (!t.categoryId) return 'Category Needed';
   const cat = categoryMap(data).get(t.categoryId);

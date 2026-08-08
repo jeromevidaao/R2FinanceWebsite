@@ -94,7 +94,7 @@ export function CategorizeModal({
     const cat = data.categories.find((c) => c.ynabId === catId);
     const categoryName = cat?.name || 'Category';
     const payeeHint =
-      !bulk && primary ? resolvePayee(data, primary.payeeId) : undefined;
+      !bulk && primary ? resolvePayee(data, primary) : undefined;
     enqueueCategorize({
       snapshots: targets.map((t) => ({ ...t })),
       categoryId: catId,
@@ -140,7 +140,7 @@ export function CategorizeModal({
               {bulk
                 ? `${targets.length} selected · net ${formatMoney(net)}`
                 : primary
-                  ? `${resolvePayee(data, primary.payeeId)} · ${formatFriendlyDate(primary.date)} · ${formatMoney(primary.amount)}`
+                  ? `${resolvePayee(data, primary)} · ${formatFriendlyDate(primary.date)} · ${formatMoney(primary.amount)}`
                   : ''}
             </p>
             {!bulk && primary && (primary.locationDisplay || primary.plaidPfc) && (

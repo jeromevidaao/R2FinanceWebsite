@@ -16,6 +16,13 @@ export interface Account {
   closed: boolean;
   note?: string | null;
   transferPayeeId?: string | null;
+  /**
+   * User nickname (R2Finance-only). Prefer this over `name` in Categorization
+   * and the rest of the UI via resolveAccountName.
+   */
+  alias?: string | null;
+  /** Last-4 digits when present in the YNAB account name. */
+  mask?: string | null;
 }
 
 export interface CategoryGroup {
@@ -78,6 +85,8 @@ export interface Transaction {
   transferAccountId?: string | null;
   transferTransactionId?: string | null;
   importId?: string | null;
+  /** Bank-feed payee when YNAB payeeId is still empty (parsed, not match JSON). */
+  importPayeeName?: string | null;
   /** Soft-delete tombstone from delta sync. */
   deleted?: boolean;
   updatedAt?: number;

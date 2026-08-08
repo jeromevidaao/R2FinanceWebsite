@@ -8,6 +8,7 @@ import { categoryChipForTxn } from '../lib/categoryDisplay';
 import { formatMoney, moneyClass } from '../lib/money';
 import {
   formatTxnStatus,
+  resolveAccountName,
   resolveCategory,
   resolvePayee,
   txnStatusPillMod,
@@ -37,7 +38,7 @@ export function RegisterPage() {
     const needle = q.trim().toLowerCase();
     if (needle) {
       list = list.filter((t) => {
-        const payee = resolvePayee(data, t.payeeId).toLowerCase();
+        const payee = resolvePayee(data, t).toLowerCase();
         const cat = resolveCategory(data, t.categoryId, t).toLowerCase();
         const memo = (t.memo || '').toLowerCase();
         return (
@@ -71,7 +72,10 @@ export function RegisterPage() {
           <Link to="/accounts" className="back-link">
             ← Accounts
           </Link>
-          <h1>{account.name}</h1>
+          <h1>{resolveAccountName(account)}</h1>
+          {account.alias?.trim() && account.alias.trim() !== account.name ? (
+            <p className="muted small">YNAB: {account.name}</p>
+          ) : null}
           <p className={`stat-value ${moneyClass(account.balance)}`}>
             {formatMoney(account.balance)}
           </p>
@@ -177,7 +181,7 @@ export function TxnTable({
           )}
           {rows.map((t) => {
             const acct = data.accounts.find((a) => a.ynabId === t.accountId);
-            const payee = resolvePayee(data, t.payeeId);
+            const payee = resolvePayee(data, t);
             const memo = t.memo || '';
             const canEditCategory = !!onCategorize && !t.transferAccountId;
             const chip = categoryChipForTxn(data, t);

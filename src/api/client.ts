@@ -78,6 +78,13 @@ function post<T>(path: string, body?: unknown) {
   });
 }
 
+function patch<T>(path: string, body?: unknown) {
+  return request<T>(path, {
+    method: 'PATCH',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────
 export const authApi = {
   bootstrap: () => post<AuthStatus>('/v1/auth/bootstrap', {}),
@@ -121,6 +128,15 @@ export const ledgerApi = {
   plan: () => get<{ plan: Plan }>('/v1/plan').then((r) => r.plan),
   accounts: () =>
     get<{ accounts: Account[] }>('/v1/accounts').then((r) => r.accounts),
+  /**
+   * Set or clear a user nickname for a ledger account (not pushed to YNAB).
+   * Pass null / empty string to clear.
+   */
+  setAccountAlias: (ynabId: string, alias: string | null) =>
+    patch<{ ok: boolean; account: Account }>(
+      `/v1/accounts/${encodeURIComponent(ynabId)}`,
+      { alias },
+    ),
   categories: () =>
     get<{ groups: CategoryGroup[]; categories: Category[] }>('/v1/categories'),
   payees: () => get<{ payees: Payee[] }>('/v1/payees').then((r) => r.payees),

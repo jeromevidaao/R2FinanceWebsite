@@ -13,6 +13,7 @@ const primaryNav = [
 ];
 
 const secondaryNav = [
+  { to: '/aliases', label: 'Aliases' },
   { to: '/transactions', label: 'Transactions' },
   { to: '/categories', label: 'Categories' },
   { to: '/payees', label: 'Payees' },

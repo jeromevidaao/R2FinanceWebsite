@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { getToken } from './api/client';
 import { Layout } from './components/Layout';
+import { AccountAliasesPage } from './pages/AccountAliasesPage';
 import { AccountsPage } from './pages/AccountsPage';
 import { BudgetPage } from './pages/BudgetPage';
 import { CategoriesPage } from './pages/CategoriesPage';
@@ -51,6 +52,7 @@ export default function App() {
         <Route index element={<BudgetPage />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="accounts/:accountId" element={<RegisterPage />} />
+        <Route path="aliases" element={<AccountAliasesPage />} />
         <Route path="inbox" element={<InboxPage />} />
         <Route path="transactions" element={<TransactionsPage />} />
         <Route path="categories" element={<CategoriesPage />} />

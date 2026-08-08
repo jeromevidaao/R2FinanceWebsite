@@ -6,7 +6,7 @@
 
 import type { Transaction } from '../api/types';
 import type { LedgerData } from './dataStore';
-import { categoryMap } from './dataStore';
+import { categoryMap, resolveAccountName } from './dataStore';
 import {
   CATEGORY_PALETTE,
   INCOME_COLOR,
@@ -144,7 +144,7 @@ export function categoryChipForTxn(
   if (t.transferAccountId) {
     const acct = data.accounts.find((a) => a.ynabId === t.transferAccountId);
     return {
-      label: acct ? `Transfer: ${acct.name}` : 'Transfer',
+      label: acct ? `Transfer: ${resolveAccountName(acct)}` : 'Transfer',
       kind: 'transfer',
       icon: '↔️',
       railColor: TRANSFER_COLOR,

@@ -137,6 +137,7 @@ export function BudgetPage() {
           <h2>Quick links</h2>
           <div className="quick-links">
             <Link to="/accounts">Accounts & registers</Link>
+            <Link to="/aliases">Account aliases / nicknames</Link>
             <Link to="/transactions">Search all transactions</Link>
             <Link to="/categories">Browse categories</Link>
             <Link to="/reports">Reflect · spending</Link>

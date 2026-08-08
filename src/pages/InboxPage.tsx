@@ -19,6 +19,7 @@ import {
   isInboxTxn,
   patchTransactionApproved,
   patchTransactionFields,
+  resolveAccountName,
   resolvePayee,
 } from '../lib/dataStore';
 import type { Transaction } from '../api/types';
@@ -276,7 +277,7 @@ export function InboxPage() {
                         >
                           <div className="inbox-main">
                             <div className="row-title">
-                              {resolvePayee(data, t.payeeId)}
+                              {resolvePayee(data, t)}
                               {pairEnd && (
                                 <span className="sister-badge muted small">
                                   {' '}
@@ -287,7 +288,7 @@ export function InboxPage() {
                             <div className="inbox-meta">
                               <span className="muted small">
                                 {formatFriendlyDate(t.date)} ·{' '}
-                                {acct?.name || 'Account'} ·{' '}
+                                {resolveAccountName(acct)} ·{' '}
                                 {formatTxnStatus(t.approved !== false)}
                                 {t.locationDisplay
                                   ? ` · ${t.locationDisplay}`
@@ -405,7 +406,10 @@ function TxnDetailModal({
   onBanner: (msg: string | null) => void;
   onCategorize: () => void;
 }) {
-  const [payee, setPayee] = useState(resolvePayee(data, txn.payeeId));
+  const [payee, setPayee] = useState(() => {
+    const resolved = resolvePayee(data, txn);
+    return resolved === '—' ? '' : resolved;
+  });
   const [amount, setAmount] = useState((txn.amount / 1000).toFixed(2));
   const [memo, setMemo] = useState(txn.memo || '');
   const [err, setErr] = useState<string | null>(null);
@@ -459,7 +463,7 @@ function TxnDetailModal({
           <div>
             <h2>Transaction</h2>
             <p className="muted">
-              {acct?.name || 'Account'} · {formatFriendlyDate(txn.date)} ·{' '}
+              {resolveAccountName(acct)} · {formatFriendlyDate(txn.date)} ·{' '}
               {formatTxnStatus(txn.approved !== false)}
             </p>
             <p className="muted small inbox-meta">

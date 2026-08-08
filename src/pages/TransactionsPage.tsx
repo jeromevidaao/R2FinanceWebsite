@@ -3,7 +3,11 @@ import { CategorizeModal } from '../components/CategorizeModal';
 import { ErrorPanel, Loading } from '../components/Loading';
 import { TxnTable } from './RegisterPage';
 import { useLedger } from '../hooks/useLedger';
-import { resolveCategory, resolvePayee } from '../lib/dataStore';
+import {
+  resolveAccountName,
+  resolveCategory,
+  resolvePayee,
+} from '../lib/dataStore';
 import type { Transaction } from '../api/types';
 
 const PAGE_SIZE_OPTIONS = [200, 500, 1000] as const;
@@ -37,18 +41,22 @@ export function TransactionsPage() {
     const needle = q.trim().toLowerCase();
     if (needle) {
       list = list.filter((t) => {
-        const payee = resolvePayee(data, t.payeeId).toLowerCase();
+        const payee = resolvePayee(data, t).toLowerCase();
         const cat = resolveCategory(data, t.categoryId, t).toLowerCase();
         const memo = (t.memo || '').toLowerCase();
-        const acct =
-          data.accounts
-            .find((a) => a.ynabId === t.accountId)
-            ?.name.toLowerCase() || '';
+        const acctObj = data.accounts.find((a) => a.ynabId === t.accountId);
+        const acct = resolveAccountName(acctObj).toLowerCase();
+        const acctYnab = (acctObj?.name || '').toLowerCase();
+        const acctAlias = (acctObj?.alias || '').toLowerCase();
+        const mask = (acctObj?.mask || '').toLowerCase();
         return (
           payee.includes(needle) ||
           cat.includes(needle) ||
           memo.includes(needle) ||
           acct.includes(needle) ||
+          acctYnab.includes(needle) ||
+          acctAlias.includes(needle) ||
+          mask.includes(needle) ||
           t.date.includes(needle)
         );
       });
@@ -114,7 +122,8 @@ export function TransactionsPage() {
           <option value="">All accounts</option>
           {data.accounts.map((a) => (
             <option key={a.ynabId} value={a.ynabId}>
-              {a.name}
+              {resolveAccountName(a)}
+              {a.mask ? ` · ••••${a.mask}` : ''}
             </option>
           ))}
         </select>
