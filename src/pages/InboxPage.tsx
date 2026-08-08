@@ -339,10 +339,11 @@ export function InboxPage() {
             clearSelection();
             setBanner(
               categorizeTxns.length > 1
-                ? `Categorized ${categorizeTxns.length}`
-                : 'Categorized',
+                ? `Categorized ${categorizeTxns.length} · saving…`
+                : 'Categorized · saving…',
             );
           }}
+          onBackgroundError={(message) => setBanner(message)}
         />
       )}
 

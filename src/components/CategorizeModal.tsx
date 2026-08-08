@@ -18,6 +18,7 @@ export function CategorizeModal({
   txn: singleTxn,
   onClose,
   onDone,
+  onBackgroundError,
 }: {
   data: LedgerData;
   /** One or many transactions (bulk applies the same category). */
@@ -26,11 +27,10 @@ export function CategorizeModal({
   txn?: Transaction;
   onClose: () => void;
   onDone?: () => void;
+  /** Optional: surface API failures after optimistic close. */
+  onBackgroundError?: (message: string) => void;
 }) {
   const [q, setQ] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [okMsg, setOkMsg] = useState<string | null>(null);
 
   const list = transactions?.length
     ? transactions
@@ -85,50 +85,36 @@ export function CategorizeModal({
       .sort((a, b) => a.group.name.localeCompare(b.group.name));
   }, [data, q]);
 
-  async function pick(catId: string) {
+  /**
+   * Optimistic: patch local cache + close immediately so the next item is
+   * reachable right away. Persist + YNAB push run in the background.
+   */
+  function pick(catId: string) {
     if (targets.length === 0) return;
-    setBusy(true);
-    setErr(null);
-    setOkMsg(null);
-    try {
-      let pushed = 0;
-      let failed = 0;
-      // Sequential so YNAB push stays small per call.
-      for (const t of targets) {
-        const result = await ledgerApi.categorize(t.ynabId, catId, true);
-        pushed += result.push?.pushed ?? 0;
-        failed += result.push?.failed ?? 0;
-      }
-      const ids = targets.map((t) => t.ynabId);
-      if (ids.length === 1) {
-        patchTransactionCategory(ids[0], catId);
-      } else {
-        patchTransactionCategoryMany(ids, catId);
-      }
-      const catName =
-        data.categories.find((c) => c.ynabId === catId)?.name || 'category';
-      if (failed > 0) {
-        setOkMsg(
-          bulk
-            ? `Saved ${ids.length} in R2Finance; some YNAB pushes failed`
-            : `Saved in R2Finance; YNAB push reported failures`,
-        );
-      } else if (pushed > 0) {
-        setOkMsg(
-          bulk
-            ? `Set ${ids.length} to ${catName} · synced to YNAB`
-            : `Set to ${catName} · synced to YNAB`,
-        );
-      } else {
-        setOkMsg(bulk ? `Set ${ids.length} to ${catName}` : `Set to ${catName}`);
-      }
-      onDone?.();
-      window.setTimeout(() => onClose(), 450);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
+    const snapshot = targets.map((t) => ({ ...t }));
+    const ids = snapshot.map((t) => t.ynabId);
+    if (ids.length === 1) {
+      patchTransactionCategory(ids[0], catId);
+    } else {
+      patchTransactionCategoryMany(ids, catId);
     }
+    onDone?.();
+    onClose();
+
+    void (async () => {
+      try {
+        // Sequential so YNAB push stays small per call.
+        for (const t of snapshot) {
+          await ledgerApi.categorize(t.ynabId, catId, true);
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error('[categorize] background save failed', msg);
+        onBackgroundError?.(
+          `Category save failed: ${msg}. Pull to refresh if anything looks wrong.`,
+        );
+      }
+    })();
   }
 
   if (targets.length === 0) {
@@ -191,8 +177,6 @@ export function CategorizeModal({
           onChange={(e) => setQ(e.target.value)}
           autoFocus
         />
-        {err && <div className="alert alert-error">{err}</div>}
-        {okMsg && <div className="alert alert-ok">{okMsg}</div>}
         <div className="modal-body cat-picker">
           {groups.length === 0 && (
             <p className="muted">No matching categories.</p>
@@ -209,11 +193,10 @@ export function CategorizeModal({
                     <li key={c.ynabId}>
                       <button
                         type="button"
-                        disabled={busy}
                         className={
                           isCurrent ? 'pick-cat-btn is-current' : 'pick-cat-btn'
                         }
-                        onClick={() => void pick(c.ynabId)}
+                        onClick={() => pick(c.ynabId)}
                       >
                         <CategoryChip chip={chip} />
                         {isCurrent ? (
@@ -228,8 +211,8 @@ export function CategorizeModal({
           ))}
         </div>
         <p className="muted small">
-          Writes to R2Finance DynamoDB and pushes the category to YNAB. Applies
-          the same category to every selected transaction.
+          Closes immediately · saves to R2Finance + YNAB in the background.
+          Same category applies to every selected transaction.
         </p>
       </div>
     </div>
@@ -242,11 +225,13 @@ export function CategorizeModalSingle({
   txn,
   onClose,
   onDone,
+  onBackgroundError,
 }: {
   data: LedgerData;
   txn: Transaction;
   onClose: () => void;
   onDone?: () => void;
+  onBackgroundError?: (message: string) => void;
 }) {
   return (
     <CategorizeModal
@@ -254,6 +239,7 @@ export function CategorizeModalSingle({
       transactions={[txn]}
       onClose={onClose}
       onDone={onDone}
+      onBackgroundError={onBackgroundError}
     />
   );
 }
