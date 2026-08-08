@@ -303,7 +303,7 @@ export function AccountsPage() {
           <p className="muted">
             Link BoA, Chase, Vanguard, or Venmo under Connectors. Accounts will
             show each account’s available balance from the connector cache — not
-            the YNAB ledger.
+            the R2Finance transaction ledger.
           </p>
           <div className="btn-row" style={{ marginTop: 12 }}>
             <Link className="btn btn-primary" to="/connectors">

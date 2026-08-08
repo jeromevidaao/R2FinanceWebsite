@@ -187,7 +187,7 @@ export function LoginPage() {
           <div className="brand-mark">R2</div>
           <div>
             <div className="brand-title">R2Finance</div>
-            <div className="brand-sub">Personal ledger · YNAB-powered backend</div>
+            <div className="brand-sub">Personal ledger · R2Finance cloud</div>
           </div>
         </div>
 

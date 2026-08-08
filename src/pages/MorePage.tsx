@@ -48,7 +48,7 @@ export function MorePage() {
             <dd>{data.plan.currency}</dd>
           </div>
           <div>
-            <dt>YNAB plan id</dt>
+            <dt>Cloud plan id</dt>
             <dd className="mono small">{data.plan.ynabPlanId || '—'}</dd>
           </div>
           <div>
@@ -87,45 +87,50 @@ export function MorePage() {
       )}
 
       <section className="panel">
-        <h2>Sync with YNAB (server-side)</h2>
+        <h2>Sync with R2Finance (cloud)</h2>
         <p className="muted">
-          Pull / push run against R2FinanceAPI + Secrets Manager. This site never
-          holds a YNAB token.
+          This website only talks to <strong>R2FinanceAPI + DynamoDB</strong> —
+          never to YNAB. Admin buttons below can ask AWS Lambdas to run the
+          backend bridge (DDB ↔ YNAB) using Secrets Manager on the server only.
         </p>
         <div className="btn-row">
           <button
             type="button"
             className="btn btn-primary"
             disabled={busy}
-            onClick={() => void run('Tick (pull+push)', () => ledgerApi.syncTick())}
+            onClick={() =>
+              void run('Cloud tick (server bridge + DDB)', () =>
+                ledgerApi.syncTick(),
+              )
+            }
           >
-            Sync now
+            Sync cloud now
           </button>
           <button
             type="button"
             className="btn btn-secondary"
             disabled={busy}
-            onClick={() => void run('Pull', () => ledgerApi.syncPull())}
+            onClick={() => void run('Server pull → DDB', () => ledgerApi.syncPull())}
           >
-            Pull only
+            Server pull → DDB
           </button>
           <button
             type="button"
             className="btn btn-secondary"
             disabled={busy}
-            onClick={() => void run('Push', () => ledgerApi.syncPush())}
+            onClick={() => void run('Server push from DDB', () => ledgerApi.syncPush())}
           >
-            Push only
+            Server push from DDB
           </button>
           <button
             type="button"
             className="btn btn-ghost"
             disabled={busy}
             onClick={() =>
-              void run('Full import', () => ledgerApi.syncImport())
+              void run('Full server import → DDB', () => ledgerApi.syncImport())
             }
           >
-            Full import
+            Full import → DDB
           </button>
           <button
             type="button"
@@ -133,7 +138,7 @@ export function MorePage() {
             disabled={busy}
             onClick={() => void refresh(true)}
           >
-            Reload ledger
+            Reload from R2Finance
           </button>
         </div>
         {msg && <pre className="sync-log">{msg}</pre>}
@@ -142,10 +147,10 @@ export function MorePage() {
       <section className="panel">
         <h2>About</h2>
         <p>
-          <strong>R2Finance</strong> is a YNAB-grade multi-account register built
-          on <code>R2FinanceAPI</code> (DynamoDB + Lambda). Envelope budgeting UI
-          surfaces spending from your cloud ledger; categorization writes back
-          through the API and can push to YNAB when sync is enabled.
+          <strong>R2Finance</strong> is a multi-account spending register on{' '}
+          <code>R2FinanceAPI</code> (DynamoDB + Lambda). The website and Android
+          app only read/write the cloud ledger. Any two-way YNAB mirror runs
+          entirely in AWS — not in the browser or phone.
         </p>
         <p className="muted small">
           Site: finance.i-liquid.be · Repo: R2FinanceWebsite

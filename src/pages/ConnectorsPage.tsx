@@ -603,8 +603,8 @@ export function ConnectorsPage() {
             , never in git or the browser.
           </li>
           <li>
-            <strong>Does not</strong> create or sync transactions into DynamoDB
-            / the YNAB ledger yet.
+            <strong>Does not</strong> create or sync bank transactions into the
+            R2Finance DynamoDB ledger yet (Plaid is for match + balances).
           </li>
         </ul>
       </section>
