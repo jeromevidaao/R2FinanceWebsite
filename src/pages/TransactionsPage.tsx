@@ -61,7 +61,7 @@ export function TransactionsPage() {
           <h1>All transactions</h1>
           <p className="muted">
             {data.transactions.length.toLocaleString()} in ledger · showing up
-            to 500 matches
+            to 500 matches · change any category to save to R2Finance + YNAB
           </p>
         </div>
       </header>

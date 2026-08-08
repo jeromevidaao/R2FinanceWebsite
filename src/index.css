@@ -715,6 +715,40 @@ select {
   text-align: right;
   white-space: nowrap;
 }
+/* Clickable category cell — change category on register / all-txns */
+.txn-cat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  margin: 0;
+  padding: 2px 4px 2px 2px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.txn-cat-btn:hover {
+  border-color: rgba(96, 165, 250, 0.45);
+  background: rgba(96, 165, 250, 0.08);
+}
+.txn-cat-btn:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.7);
+  outline-offset: 2px;
+}
+.txn-cat-edit {
+  flex-shrink: 0;
+  opacity: 0.75;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.txn-cat-btn:hover .txn-cat-edit {
+  opacity: 1;
+  color: var(--text, #e8eef7);
+}
 .table-foot {
   padding: 10px 12px;
 }

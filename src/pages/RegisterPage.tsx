@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { CategorizeModal } from '../components/CategorizeModal';
+import { CategoryChip } from '../components/CategoryChip';
 import { ErrorPanel, Loading } from '../components/Loading';
 import { useLedger } from '../hooks/useLedger';
+import { categoryChipForTxn } from '../lib/categoryDisplay';
 import { formatMoney, moneyClass } from '../lib/money';
 import {
   resolveCategory,
@@ -145,6 +147,8 @@ export function TxnTable({
             const outflow = t.amount < 0 ? t.amount : 0;
             const inflow = t.amount > 0 ? t.amount : 0;
             const acct = data.accounts.find((a) => a.ynabId === t.accountId);
+            const canEditCategory = !!onCategorize && !t.transferAccountId;
+            const chip = categoryChipForTxn(data, t);
             return (
               <tr key={t.ynabId}>
                 <td className="mono">{t.date}</td>
@@ -156,8 +160,30 @@ export function TxnTable({
                   </td>
                 )}
                 <td>{resolvePayee(data, t.payeeId)}</td>
-                <td className={!t.categoryId && !t.transferAccountId ? 'warn' : ''}>
-                  {resolveCategory(data, t.categoryId, t)}
+                <td
+                  className={
+                    !t.categoryId && !t.transferAccountId ? 'warn' : undefined
+                  }
+                >
+                  {canEditCategory ? (
+                    <button
+                      type="button"
+                      className="txn-cat-btn"
+                      title={
+                        t.categoryId
+                          ? 'Change category (saves to cloud + YNAB)'
+                          : 'Set category (saves to cloud + YNAB)'
+                      }
+                      onClick={() => onCategorize?.(t)}
+                    >
+                      <CategoryChip chip={chip} />
+                      <span className="txn-cat-edit muted small">
+                        {t.categoryId ? 'Change' : 'Set'}
+                      </span>
+                    </button>
+                  ) : (
+                    <CategoryChip chip={chip} />
+                  )}
                 </td>
                 <td className="muted">{t.memo || ''}</td>
                 <td>
@@ -173,13 +199,13 @@ export function TxnTable({
                   {inflow ? formatMoney(inflow) : ''}
                 </td>
                 <td>
-                  {onCategorize && !t.transferAccountId && (
+                  {canEditCategory && (
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
-                      onClick={() => onCategorize(t)}
+                      onClick={() => onCategorize?.(t)}
                     >
-                      {t.categoryId ? 'Edit' : 'Categorize'}
+                      {t.categoryId ? 'Change category' : 'Categorize'}
                     </button>
                   )}
                 </td>
@@ -190,6 +216,9 @@ export function TxnTable({
       </table>
       <div className="table-foot muted small">
         {rows.length.toLocaleString()} transactions
+        {onCategorize
+          ? ' · click a category to change it (syncs to cloud + YNAB)'
+          : ''}
       </div>
     </div>
   );

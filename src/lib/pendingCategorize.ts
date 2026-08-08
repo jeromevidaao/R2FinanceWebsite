@@ -121,6 +121,19 @@ export function enqueueCategorize(opts: {
   return id;
 }
 
+function pushErrorMessage(push: {
+  failed?: number;
+  error?: string;
+  results?: Array<{ ok?: boolean; error?: string; ynabTxnId?: string }>;
+} | null | undefined): string | null {
+  if (!push) return null;
+  if (typeof push.error === 'string' && push.error.trim()) return push.error;
+  if ((push.failed ?? 0) <= 0) return null;
+  const firstFail = (push.results || []).find((r) => r && r.ok === false);
+  if (firstFail?.error) return firstFail.error;
+  return `YNAB push failed (${push.failed})`;
+}
+
 async function commitPending(id: string): Promise<void> {
   const entry = pending.get(id);
   if (!entry) return;
@@ -129,7 +142,16 @@ async function commitPending(id: string): Promise<void> {
 
   try {
     for (const t of entry.snapshots) {
-      await ledgerApi.categorize(t.ynabId, entry.categoryId, true);
+      // Writes category to DynamoDB (R2Finance), marks PENDING_PUSH, then
+      // immediately pushes that row to the YNAB API.
+      const result = await ledgerApi.categorize(
+        t.ynabId,
+        entry.categoryId,
+        true,
+      );
+      const pushErr = pushErrorMessage(result.push);
+      if (result.error) throw new Error(result.error);
+      if (pushErr) throw new Error(pushErr);
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

@@ -229,7 +229,8 @@ export function CategorizeModal({
         </div>
         <p className="muted small">
           Tap a category to return to the list. You have about 10 seconds to
-          Undo before it saves — same category for every selected transaction.
+          Undo before it saves to R2Finance and YNAB
+          {bulk ? ' — same category for every selected transaction' : ''}.
         </p>
       </div>
     </div>
