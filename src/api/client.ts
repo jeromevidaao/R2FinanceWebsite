@@ -171,8 +171,11 @@ export const ledgerApi = {
           txnTotal: pack.txnTotal ?? transactions.length,
           cursor: pack.cursor || pack.serverTime,
           counts: {
-            ...(first.counts || {}),
-            ...(pack.counts || {}),
+            accounts: first.counts?.accounts ?? first.accounts?.length ?? 0,
+            groups: first.counts?.groups ?? first.groups?.length ?? 0,
+            categories:
+              first.counts?.categories ?? first.categories?.length ?? 0,
+            payees: first.counts?.payees ?? first.payees?.length ?? 0,
             transactions: transactions.length,
             txnTotal: pack.txnTotal ?? transactions.length,
           },
