@@ -271,6 +271,9 @@ export function InboxPage() {
                               <span className="muted small">
                                 {formatFriendlyDate(t.date)} · {acct?.name || 'Account'} ·{' '}
                                 {formatClearedLabel(t.cleared, t.approved)}
+                                {t.locationDisplay
+                                  ? ` · ${t.locationDisplay}`
+                                  : ''}
                               </span>
                             </div>
                             {t.memo && (
@@ -341,14 +344,9 @@ export function InboxPage() {
           onClose={() => setCategorizeIds(null)}
           onDone={() => {
             // Local cache already dropped rows; stay on this page — no refresh().
+            // Cloud save waits ~10s (Undo bar); errors surface on UndoCategorizeBar.
             clearSelection();
-            setBanner(
-              categorizeTxns.length > 1
-                ? `Categorized ${categorizeTxns.length}`
-                : null,
-            );
           }}
-          onBackgroundError={(message) => setBanner(message)}
         />
       )}
 

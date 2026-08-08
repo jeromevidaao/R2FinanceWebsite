@@ -96,7 +96,6 @@ export function CategorizeModal({
     if (targets.length === 0) return;
     const snapshot = targets.map((t) => ({ ...t }));
     const ids = snapshot.map((t) => t.ynabId);
-    // Local remove first — UI returns to the list instantly.
     if (ids.length === 1) {
       patchTransactionCategory(ids[0], catId);
     } else {
@@ -107,7 +106,6 @@ export function CategorizeModal({
 
     void (async () => {
       try {
-        // Sequential so YNAB push stays small per call. Do not call loadLedger.
         for (const t of snapshot) {
           await ledgerApi.categorize(t.ynabId, catId, true);
         }
@@ -159,6 +157,34 @@ export function CategorizeModal({
                   ? `${resolvePayee(data, primary.payeeId)} · ${formatFriendlyDate(primary.date)} · ${formatMoney(primary.amount)}`
                   : ''}
             </p>
+            {!bulk && primary?.locationDisplay && (
+              <p
+                className="muted small inbox-meta"
+                title={primary.location?.text || undefined}
+              >
+                📍 {primary.locationDisplay}
+                {primary.plaidPfc ? ` · ${primary.plaidPfc}` : ''}
+              </p>
+            )}
+            {bulk &&
+              (() => {
+                const locs = [
+                  ...new Set(
+                    targets
+                      .map((t) => t.locationDisplay)
+                      .filter((s): s is string => !!s),
+                  ),
+                ];
+                if (!locs.length) return null;
+                return (
+                  <p className="muted small inbox-meta">
+                    📍{' '}
+                    {locs.length <= 3
+                      ? locs.join(' · ')
+                      : `${locs.slice(0, 2).join(' · ')} +${locs.length - 2} more`}
+                  </p>
+                );
+              })()}
             {isRecat && currentChip && (
               <p className="muted small inbox-meta">
                 Current: <CategoryChip chip={currentChip} />

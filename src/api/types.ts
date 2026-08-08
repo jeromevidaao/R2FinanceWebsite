@@ -49,6 +49,18 @@ export interface SubTransaction {
   transferAccountId?: string | null;
 }
 
+export interface TransactionLocation {
+  address?: string | null;
+  city?: string | null;
+  region?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+  lat?: number | null;
+  lon?: number | null;
+  store_number?: string | null;
+  text?: string | null;
+}
+
 export interface Transaction {
   /** Stable client key when present (device-created rows). */
   id?: string;
@@ -70,6 +82,22 @@ export interface Transaction {
   deleted?: boolean;
   updatedAt?: number;
   subtransactions: SubTransaction[];
+  /** Plaid match + location (from cloud enrich). */
+  plaidTransactionId?: string | null;
+  plaidMerchantName?: string | null;
+  plaidPaymentChannel?: string | null;
+  plaidPfc?: string | null;
+  matchTier?: string | null;
+  matchConfidence?: number | null;
+  location?: TransactionLocation | null;
+  locationSource?: string | null;
+  /** UI: "City, ST" (US) or "City, Country" (intl). */
+  locationDisplay?: string | null;
+  enrichedAt?: string | null;
+  /** Inbox-only extras */
+  accountName?: string | null;
+  payeeName?: string | null;
+  reason?: string | null;
 }
 
 /** Response from GET /v1/sync/changes */
