@@ -9,6 +9,7 @@ import {
   monthKey,
 } from '../lib/money';
 import { isInboxTxn } from '../lib/dataStore';
+import { buildSpendingReport } from '../lib/analytics';
 
 export function BudgetPage() {
   const { data, loading, error, refresh } = useLedger();
@@ -19,47 +20,31 @@ export function BudgetPage() {
     const accountsTotal = openAccounts.reduce((s, a) => s + a.balance, 0);
     const inbox = data.transactions.filter((t) => isInboxTxn(t, data));
     const thisMonth = monthKey(new Date().toISOString().slice(0, 10));
-    const monthTxns = data.transactions.filter(
-      (t) =>
-        monthKey(t.date) === thisMonth &&
-        !t.transferAccountId &&
-        t.approved !== false,
-    );
-    const inflow = monthTxns
-      .filter((t) => t.amount > 0)
-      .reduce((s, t) => s + t.amount, 0);
-    const outflow = monthTxns
-      .filter((t) => t.amount < 0)
-      .reduce((s, t) => s + t.amount, 0);
-
-    // Spending by category this month
-    const byCat = new Map<string, number>();
-    for (const t of monthTxns) {
-      if (t.amount >= 0) continue;
-      const key = t.categoryId || '__uncat';
-      byCat.set(key, (byCat.get(key) || 0) + t.amount);
-    }
-    const topSpend = [...byCat.entries()]
-      .sort((a, b) => a[1] - b[1])
-      .slice(0, 8)
-      .map(([id, amt]) => {
-        const cat = data.categories.find((c) => c.ynabId === id);
-        const name =
-          id === '__uncat'
-            ? 'Uncategorized'
-            : cat?.name || 'Unknown';
-        return { id, name, amt };
-      });
+    // Same YNAB-aligned formula as Reflect (net spending, RTA = income).
+    const report = buildSpendingReport({
+      transactions: data.transactions,
+      categories: data.categories,
+      groups: data.groups,
+      payees: data.payees,
+      accounts: data.accounts,
+      mode: 'month',
+      periodKey: thisMonth,
+    });
+    const topSpend = report.byCategory.slice(0, 8).map((r) => ({
+      id: r.id,
+      name: r.name,
+      amt: r.amount,
+    }));
 
     return {
       accountsTotal,
       openCount: openAccounts.length,
       inbox,
       thisMonth,
-      inflow,
-      outflow,
+      inflow: report.inflow,
+      outflow: report.outflow,
       topSpend,
-      net: inflow + outflow,
+      net: report.net,
     };
   }, [data]);
 
