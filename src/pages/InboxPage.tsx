@@ -4,6 +4,7 @@ import { CategoryChip } from '../components/CategoryChip';
 import { ErrorPanel, Loading } from '../components/Loading';
 import { useLedger } from '../hooks/useLedger';
 import { formatMoney, moneyClass } from '../lib/money';
+import { formatFriendlyDate } from '../lib/relativeDate';
 import { ledgerApi } from '../api/client';
 import {
   categoryChipForTxn,
@@ -268,7 +269,7 @@ export function InboxPage() {
                             </div>
                             <div className="inbox-meta">
                               <span className="muted small">
-                                {t.date} · {acct?.name || 'Account'} ·{' '}
+                                {formatFriendlyDate(t.date)} · {acct?.name || 'Account'} ·{' '}
                                 {formatClearedLabel(t.cleared, t.approved)}
                               </span>
                             </div>
@@ -440,7 +441,7 @@ function TxnDetailModal({
           <div>
             <h2>Transaction</h2>
             <p className="muted">
-              {acct?.name || 'Account'} · {txn.date} ·{' '}
+              {acct?.name || 'Account'} · {formatFriendlyDate(txn.date)} ·{' '}
               {formatClearedLabel(txn.cleared, txn.approved)}
             </p>
             <p className="muted small inbox-meta">

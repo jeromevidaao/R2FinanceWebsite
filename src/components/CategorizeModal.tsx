@@ -4,6 +4,7 @@ import type { Category, CategoryGroup, Transaction } from '../api/types';
 import { CategoryChip } from './CategoryChip';
 import { categoryChipForCategory, categoryChipForTxn } from '../lib/categoryDisplay';
 import { formatMoney } from '../lib/money';
+import { formatFriendlyDate } from '../lib/relativeDate';
 import {
   isAssignableCategory,
   patchTransactionCategory,
@@ -155,7 +156,7 @@ export function CategorizeModal({
               {bulk
                 ? `${targets.length} selected · net ${formatMoney(net)}`
                 : primary
-                  ? `${resolvePayee(data, primary.payeeId)} · ${primary.date} · ${formatMoney(primary.amount)}`
+                  ? `${resolvePayee(data, primary.payeeId)} · ${formatFriendlyDate(primary.date)} · ${formatMoney(primary.amount)}`
                   : ''}
             </p>
             {isRecat && currentChip && (
