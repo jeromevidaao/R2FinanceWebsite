@@ -6,8 +6,17 @@ import type {
   Payee,
   Plan,
   Stats,
+  SyncChanges,
   Transaction,
 } from '../api/types';
+import {
+  FULL_SYNC_INTERVAL_MS,
+  loadMeta,
+  loadSnapshot,
+  saveMeta,
+  saveSnapshot,
+  type LedgerMeta,
+} from './ledgerPersist';
 
 export interface LedgerData {
   plan: Plan;
@@ -23,7 +32,9 @@ export interface LedgerData {
 type Listener = () => void;
 
 let cache: LedgerData | null = null;
+let meta: LedgerMeta | null = null;
 let loading: Promise<LedgerData> | null = null;
+let bootstrapped = false;
 const listeners = new Set<Listener>();
 
 export function subscribe(fn: Listener): () => void {
@@ -41,35 +52,210 @@ export function getCache(): LedgerData | null {
   return cache;
 }
 
-export async function loadLedger(force = false): Promise<LedgerData> {
+function txnKey(t: Transaction): string {
+  return t.id || t.clientId || t.ynabId;
+}
+
+function sortTxns(list: Transaction[]): Transaction[] {
+  return list
+    .filter((t) => !t.deleted)
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+}
+
+function applyDelta(base: LedgerData, pack: SyncChanges): LedgerData {
+  const accountMap = new Map(base.accounts.map((a) => [a.ynabId, a]));
+  for (const a of pack.accounts || []) {
+    if (a.deleted || a.closed) {
+      accountMap.delete(a.ynabId);
+    } else {
+      accountMap.set(a.ynabId, {
+        ynabId: a.ynabId,
+        name: a.name,
+        type: a.type,
+        balance: a.balance,
+        onBudget: a.onBudget,
+        closed: a.closed,
+        note: a.note,
+        transferPayeeId: a.transferPayeeId,
+      });
+    }
+  }
+
+  const groupMap = new Map(base.groups.map((g) => [g.ynabId, g]));
+  for (const g of pack.groups || []) {
+    if (g.deleted) groupMap.delete(g.ynabId);
+    else {
+      groupMap.set(g.ynabId, {
+        ynabId: g.ynabId,
+        name: g.name,
+        hidden: g.hidden,
+      });
+    }
+  }
+
+  const catMap = new Map(base.categories.map((c) => [c.ynabId, c]));
+  for (const c of pack.categories || []) {
+    if (c.deleted) catMap.delete(c.ynabId);
+    else {
+      catMap.set(c.ynabId, {
+        ynabId: c.ynabId,
+        name: c.name,
+        categoryGroupId: c.categoryGroupId,
+        hidden: c.hidden,
+        color: c.color,
+      });
+    }
+  }
+
+  const payeeMap = new Map(base.payees.map((p) => [p.ynabId, p]));
+  for (const p of pack.payees || []) {
+    if (p.deleted) payeeMap.delete(p.ynabId);
+    else {
+      payeeMap.set(p.ynabId, {
+        ynabId: p.ynabId,
+        name: p.name,
+        transferAccountId: p.transferAccountId,
+      });
+    }
+  }
+
+  const txnMap = new Map(base.transactions.map((t) => [txnKey(t), t]));
+  for (const t of pack.transactions || []) {
+    const k = txnKey(t);
+    if (!k) continue;
+    if (t.deleted) {
+      txnMap.delete(k);
+      // Also drop by ynabId alias if different
+      if (t.ynabId) txnMap.delete(t.ynabId);
+    } else {
+      txnMap.set(k, { ...t, deleted: false });
+    }
+  }
+
+  return {
+    plan: pack.plan || base.plan,
+    stats: base.stats,
+    accounts: Array.from(accountMap.values()),
+    groups: Array.from(groupMap.values()),
+    categories: Array.from(catMap.values()),
+    payees: Array.from(payeeMap.values()),
+    transactions: sortTxns(Array.from(txnMap.values())),
+    loadedAt: Date.now(),
+  };
+}
+
+function fromFullPack(pack: SyncChanges, stats: Stats | null): LedgerData {
+  return {
+    plan: pack.plan,
+    stats,
+    accounts: (pack.accounts || [])
+      .filter((a) => !a.deleted && !a.closed)
+      .map((a) => ({
+        ynabId: a.ynabId,
+        name: a.name,
+        type: a.type,
+        balance: a.balance,
+        onBudget: a.onBudget,
+        closed: a.closed,
+        note: a.note,
+        transferPayeeId: a.transferPayeeId,
+      })),
+    groups: (pack.groups || [])
+      .filter((g) => !g.deleted)
+      .map((g) => ({
+        ynabId: g.ynabId,
+        name: g.name,
+        hidden: g.hidden,
+      })),
+    categories: (pack.categories || [])
+      .filter((c) => !c.deleted)
+      .map((c) => ({
+        ynabId: c.ynabId,
+        name: c.name,
+        categoryGroupId: c.categoryGroupId,
+        hidden: c.hidden,
+        color: c.color,
+      })),
+    payees: (pack.payees || [])
+      .filter((p) => !p.deleted)
+      .map((p) => ({
+        ynabId: p.ynabId,
+        name: p.name,
+        transferAccountId: p.transferAccountId,
+      })),
+    transactions: sortTxns(pack.transactions || []),
+    loadedAt: Date.now(),
+  };
+}
+
+async function persist(data: LedgerData, nextMeta: LedgerMeta) {
+  cache = data;
+  meta = nextMeta;
+  notify();
+  await Promise.all([saveSnapshot(data), saveMeta(nextMeta)]);
+}
+
+/**
+ * Hydrate memory + IndexedDB first (instant UI), then pull delta/full from API.
+ *
+ * @param force when true, revalidate from network (still prefers delta unless full due)
+ * @param forceFull when true, force full snapshot download
+ */
+export async function loadLedger(
+  force = false,
+  forceFull = false,
+): Promise<LedgerData> {
+  // Instant path: return in-memory without network if warm and not forced.
   if (cache && !force) return cache;
   if (loading && !force) return loading;
 
   loading = (async () => {
-    const [plan, accounts, catPack, payees, transactions, stats] =
-      await Promise.all([
-        ledgerApi.plan(),
-        ledgerApi.accounts(),
-        ledgerApi.categories(),
-        ledgerApi.payees(),
-        ledgerApi.transactions(),
-        ledgerApi.stats().catch(() => null),
-      ]);
+    // 1) Disk hydrate so Home/Spending paint without waiting on AWS.
+    if (!bootstrapped) {
+      bootstrapped = true;
+      const [snap, m] = await Promise.all([loadSnapshot(), loadMeta()]);
+      meta = m;
+      if (snap?.transactions) {
+        cache = {
+          ...(snap as unknown as LedgerData),
+          transactions: sortTxns(
+            snap.transactions as unknown as Transaction[],
+          ),
+        };
+        notify();
+      }
+    }
 
-    cache = {
-      plan,
-      stats,
-      accounts,
-      groups: catPack.groups,
-      categories: catPack.categories,
-      payees,
-      transactions: transactions.sort((a, b) =>
-        a.date < b.date ? 1 : a.date > b.date ? -1 : 0,
-      ),
-      loadedAt: Date.now(),
+    const now = Date.now();
+    const cursor = meta?.cursor || 0;
+    const lastFullAt = meta?.lastFullAt || 0;
+    const fullDue =
+      forceFull ||
+      !cache ||
+      cursor <= 0 ||
+      !lastFullAt ||
+      now - lastFullAt >= FULL_SYNC_INTERVAL_MS;
+
+    // 2) Network: one lightweight changes call (or full when empty / interval).
+    const pack = await ledgerApi.syncChanges(fullDue ? 0 : cursor, fullDue);
+    const stats = await ledgerApi.stats().catch(() => cache?.stats ?? null);
+
+    let next: LedgerData;
+    if (pack.mode === 'full' || fullDue || !cache) {
+      next = fromFullPack(pack, stats);
+    } else {
+      next = applyDelta(cache, pack);
+      next = { ...next, stats };
+    }
+
+    const nextMeta: LedgerMeta = {
+      cursor: pack.cursor || pack.serverTime || now,
+      lastFullAt:
+        pack.mode === 'full' || fullDue ? now : lastFullAt || now,
+      lastSyncedAt: now,
     };
-    notify();
-    return cache;
+    await persist(next, nextMeta);
+    return next;
   })();
 
   try {
@@ -77,6 +263,14 @@ export async function loadLedger(force = false): Promise<LedgerData> {
   } finally {
     loading = null;
   }
+}
+
+/**
+ * Background revalidation used after first paint from cache.
+ * Safe to call multiple times; shares in-flight load.
+ */
+export function revalidateLedger(forceFull = false): Promise<LedgerData> {
+  return loadLedger(true, forceFull);
 }
 
 export function accountMap(data: LedgerData): Map<string, Account> {
@@ -156,6 +350,7 @@ export function patchTransactionCategory(
     ),
   };
   notify();
+  void saveSnapshot(cache);
 }
 
 export function patchTransactionCategoryMany(
@@ -173,6 +368,7 @@ export function patchTransactionCategoryMany(
     ),
   };
   notify();
+  void saveSnapshot(cache);
 }
 
 export function patchTransactionApproved(ynabTxnIds: string[]) {
@@ -185,6 +381,7 @@ export function patchTransactionApproved(ynabTxnIds: string[]) {
     ),
   };
   notify();
+  void saveSnapshot(cache);
 }
 
 export function patchTransactionFields(
@@ -204,6 +401,7 @@ export function patchTransactionFields(
     ),
   };
   notify();
+  void saveSnapshot(cache);
 }
 
 /** Human category / system type for list rows. Prefer categoryChipForTxn for UI. */

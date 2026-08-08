@@ -50,6 +50,9 @@ export interface SubTransaction {
 }
 
 export interface Transaction {
+  /** Stable client key when present (device-created rows). */
+  id?: string;
+  clientId?: string | null;
   ynabId: string;
   accountId: string;
   date: string;
@@ -63,7 +66,31 @@ export interface Transaction {
   transferAccountId?: string | null;
   transferTransactionId?: string | null;
   importId?: string | null;
+  /** Soft-delete tombstone from delta sync. */
+  deleted?: boolean;
+  updatedAt?: number;
   subtransactions: SubTransaction[];
+}
+
+/** Response from GET /v1/sync/changes */
+export interface SyncChanges {
+  mode: 'full' | 'delta' | string;
+  serverTime: number;
+  cursor: number;
+  since: number;
+  plan: Plan;
+  accounts: Array<Account & { deleted?: boolean; updatedAt?: number }>;
+  groups: Array<CategoryGroup & { deleted?: boolean; updatedAt?: number }>;
+  categories: Array<Category & { deleted?: boolean; updatedAt?: number }>;
+  payees: Array<Payee & { deleted?: boolean; updatedAt?: number }>;
+  transactions: Transaction[];
+  counts?: {
+    accounts: number;
+    groups: number;
+    categories: number;
+    payees: number;
+    transactions: number;
+  };
 }
 
 export interface Stats {

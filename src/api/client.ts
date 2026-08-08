@@ -9,6 +9,7 @@ import type {
   Payee,
   Plan,
   Stats,
+  SyncChanges,
   Transaction,
 } from './types';
 
@@ -35,6 +36,8 @@ export function setSession(token: string, email: string) {
 export function clearSession() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(EMAIL_KEY);
+  // Drop local ledger so the next login does a clean full hydrate.
+  void import('../lib/ledgerPersist').then((m) => m.clearPersisted());
 }
 
 async function request<T>(
@@ -124,6 +127,17 @@ export const ledgerApi = {
     get<{ transactions: Transaction[] }>('/v1/transactions').then(
       (r) => r.transactions,
     ),
+  /**
+   * Local-first snapshot: full when since=0 / full=1, else rows changed after cursor.
+   * Includes deleted tombstones in delta mode.
+   */
+  syncChanges: (since = 0, full = false) => {
+    const q =
+      full || since <= 0
+        ? '/v1/sync/changes?full=1'
+        : `/v1/sync/changes?since=${encodeURIComponent(String(since))}`;
+    return get<SyncChanges>(q);
+  },
   categorize: (ynabTxnId: string, categoryYnabId: string, push = true) =>
     post<CategorizeResult>('/v1/transactions/categorize', {
       ynabTxnId,
