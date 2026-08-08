@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { clearSession, getEmail } from '../api/client';
 import { useLedger } from '../hooks/useLedger';
 import { isInboxTxn } from '../lib/dataStore';
+import { UndoCategorizeBar } from './UndoCategorizeBar';
 
 /** Primary bottom-nav parity: Home · Categorization · Account · Reflect */
 const primaryNav = [
@@ -84,6 +85,7 @@ export function Layout() {
       <main className="main">
         <Outlet />
       </main>
+      <UndoCategorizeBar />
     </div>
   );
 }

@@ -371,6 +371,29 @@ export function patchTransactionCategoryMany(
   void saveSnapshot(cache);
 }
 
+/**
+ * Restore categoryId + approved from pre-categorize snapshots (undo).
+ * Rows reappear in the inbox if they were unapproved / uncategorized.
+ */
+export function restoreTransactionSnapshots(snapshots: Transaction[]) {
+  if (!cache || snapshots.length === 0) return;
+  const byId = new Map(snapshots.map((t) => [t.ynabId, t]));
+  cache = {
+    ...cache,
+    transactions: cache.transactions.map((t) => {
+      const snap = byId.get(t.ynabId);
+      if (!snap) return t;
+      return {
+        ...t,
+        categoryId: snap.categoryId,
+        approved: snap.approved,
+      };
+    }),
+  };
+  notify();
+  void saveSnapshot(cache);
+}
+
 export function patchTransactionApproved(ynabTxnIds: string[]) {
   if (!cache || ynabTxnIds.length === 0) return;
   const set = new Set(ynabTxnIds);

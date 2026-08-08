@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { ledgerApi } from '../api/client';
 import type { Category, CategoryGroup, Transaction } from '../api/types';
 import { CategoryChip } from './CategoryChip';
 import { categoryChipForCategory, categoryChipForTxn } from '../lib/categoryDisplay';
@@ -7,11 +6,10 @@ import { formatMoney } from '../lib/money';
 import { formatFriendlyDate } from '../lib/relativeDate';
 import {
   isAssignableCategory,
-  patchTransactionCategory,
-  patchTransactionCategoryMany,
   resolvePayee,
 } from '../lib/dataStore';
 import type { LedgerData } from '../lib/dataStore';
+import { enqueueCategorize } from '../lib/pendingCategorize';
 
 export function CategorizeModal({
   data,
@@ -19,7 +17,6 @@ export function CategorizeModal({
   txn: singleTxn,
   onClose,
   onDone,
-  onBackgroundError,
 }: {
   data: LedgerData;
   /** One or many transactions (bulk applies the same category). */
@@ -28,7 +25,7 @@ export function CategorizeModal({
   txn?: Transaction;
   onClose: () => void;
   onDone?: () => void;
-  /** Optional: surface API failures after optimistic close. */
+  /** @deprecated Errors surface via UndoCategorizeBar. */
   onBackgroundError?: (message: string) => void;
 }) {
   const [q, setQ] = useState('');
@@ -87,36 +84,25 @@ export function CategorizeModal({
   }, [data, q]);
 
   /**
-   * Super-fast path:
+   * Super-fast path + 10s undo window:
    * 1. Patch local cache → Categorization list drops rows (no HTTP)
    * 2. Close modal → back on the same list
-   * 3. Persist + YNAB push in the background (never reloads ledger)
+   * 3. API push after ~10s (UndoCategorizeBar can cancel)
    */
   function pick(catId: string) {
     if (targets.length === 0) return;
-    const snapshot = targets.map((t) => ({ ...t }));
-    const ids = snapshot.map((t) => t.ynabId);
-    if (ids.length === 1) {
-      patchTransactionCategory(ids[0], catId);
-    } else {
-      patchTransactionCategoryMany(ids, catId);
-    }
+    const cat = data.categories.find((c) => c.ynabId === catId);
+    const categoryName = cat?.name || 'Category';
+    const payeeHint =
+      !bulk && primary ? resolvePayee(data, primary.payeeId) : undefined;
+    enqueueCategorize({
+      snapshots: targets.map((t) => ({ ...t })),
+      categoryId: catId,
+      categoryName,
+      payeeHint,
+    });
     onDone?.();
     onClose();
-
-    void (async () => {
-      try {
-        for (const t of snapshot) {
-          await ledgerApi.categorize(t.ynabId, catId, true);
-        }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error('[categorize] background save failed', msg);
-        onBackgroundError?.(
-          `Category save failed: ${msg}. Pull to refresh if anything looks wrong.`,
-        );
-      }
-    })();
   }
 
   if (targets.length === 0) {
@@ -157,34 +143,6 @@ export function CategorizeModal({
                   ? `${resolvePayee(data, primary.payeeId)} · ${formatFriendlyDate(primary.date)} · ${formatMoney(primary.amount)}`
                   : ''}
             </p>
-            {!bulk && primary?.locationDisplay && (
-              <p
-                className="muted small inbox-meta"
-                title={primary.location?.text || undefined}
-              >
-                📍 {primary.locationDisplay}
-                {primary.plaidPfc ? ` · ${primary.plaidPfc}` : ''}
-              </p>
-            )}
-            {bulk &&
-              (() => {
-                const locs = [
-                  ...new Set(
-                    targets
-                      .map((t) => t.locationDisplay)
-                      .filter((s): s is string => !!s),
-                  ),
-                ];
-                if (!locs.length) return null;
-                return (
-                  <p className="muted small inbox-meta">
-                    📍{' '}
-                    {locs.length <= 3
-                      ? locs.join(' · ')
-                      : `${locs.slice(0, 2).join(' · ')} +${locs.length - 2} more`}
-                  </p>
-                );
-              })()}
             {isRecat && currentChip && (
               <p className="muted small inbox-meta">
                 Current: <CategoryChip chip={currentChip} />
@@ -241,8 +199,8 @@ export function CategorizeModal({
           ))}
         </div>
         <p className="muted small">
-          Tap a category to return to the list instantly. Saves in the
-          background — same category for every selected transaction.
+          Tap a category to return to the list. You have about 10 seconds to
+          Undo before it saves — same category for every selected transaction.
         </p>
       </div>
     </div>
