@@ -1310,9 +1310,14 @@ select {
   background: #3dcc91;
 }
 
-/* Reflect / Spending Breakdown */
+/* Reflect / Spending Breakdown — use full page width (not a narrow column) */
 .reflect-page {
-  max-width: 720px;
+  max-width: min(1400px, calc(100vw - 24px));
+}
+/* Stack cards with room to breathe on the wider canvas */
+.reflect-page .reflect-card-link,
+.reflect-page > .reflect-card {
+  max-width: none;
 }
 .reflect-card-link {
   display: block;
