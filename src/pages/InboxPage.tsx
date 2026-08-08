@@ -223,8 +223,8 @@ export function InboxPage() {
               </>
             ) : (
               <>
-                By date · sister pairs still merged · Shift+click for range
-                select · approve works without a category
+                Spreadsheet view · date on each row · sister pairs merged ·
+                Shift+click range · approve works without a category
               </>
             )}
           </p>
@@ -268,152 +268,184 @@ export function InboxPage() {
           </p>
         </div>
       ) : (
-        <div className="panel inbox-panel">
-          {dateGroups.map((group) => {
-            const groupIds = group.items.map((row) => row.transaction.ynabId);
-            const selectedInGroup = groupIds.filter((id) =>
-              selectedLive.has(id),
-            ).length;
-            const allGroupSelected =
-              groupIds.length > 0 && selectedInGroup === groupIds.length;
-            return (
-              <section key={group.key} className="inbox-cat-group">
-                <header className="inbox-cat-header">
-                  <span className="inbox-date-label">
-                    {formatFriendlyDate(group.date)}
-                  </span>
-                  <span className="muted small">
-                    {group.items.length}
-                    {selectedInGroup > 0 && selectedInGroup < groupIds.length
-                      ? ` · ${selectedInGroup} selected`
-                      : ''}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm inbox-cat-select"
-                    onClick={() => selectGroup(groupIds)}
-                  >
-                    {allGroupSelected ? 'Deselect' : 'Select'}
-                  </button>
-                </header>
-                <ul className="inbox-list inbox-list--railed">
-                  {group.items.map((row, idx) => {
-                    const t = row.transaction;
-                    const acct = data.accounts.find(
-                      (a) => a.ynabId === t.accountId,
-                    );
-                    const isSel = selectedLive.has(t.ynabId);
-                    const isFirst = idx === 0;
-                    const isLast = idx === group.items.length - 1;
-                    return (
-                      <li
-                        key={t.ynabId}
-                        className={[
-                          'inbox-row',
-                          'inbox-row--railed',
-                          isSel ? 'is-selected' : '',
-                          isFirst ? 'is-group-first' : '',
-                          isLast ? 'is-group-last' : '',
-                          row.sisterPair ? 'inbox-row--sister' : '',
-                          row.sisterStart ? 'is-sister-start' : '',
-                          row.sisterEnd ? 'is-sister-end' : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' ')}
-                        style={
-                          {
-                            '--rail-color': row.railColor,
-                          } as CSSProperties
-                        }
-                      >
-                        <span className="inbox-rail" aria-hidden />
-                        <span className="inbox-check">
-                          <input
-                            type="checkbox"
-                            checked={isSel}
-                            onChange={(e) =>
-                              onCheckboxChange(t.ynabId, e.target.checked)
-                            }
-                            onClick={(e) => onCheckboxClick(t.ynabId, e)}
-                            aria-label={
-                              isSel
-                                ? `Deselect ${resolvePayee(data, t)}`
-                                : `Select ${resolvePayee(data, t)}`
-                            }
-                          />
-                        </span>
-                        <button
-                          type="button"
-                          className="inbox-main-btn"
+        <div className="table-wrap panel inbox-panel">
+          <table className="inbox-table">
+            <colgroup>
+              <col className="inbox-col-check" />
+              <col className="inbox-col-date" />
+              <col className="inbox-col-payee" />
+              <col className="inbox-col-account" />
+              <col className="inbox-col-category" />
+              <col className="inbox-col-status" />
+              <col className="inbox-col-amount" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th scope="col" className="inbox-th-check">
+                  <span className="sr-only">Select</span>
+                </th>
+                <th scope="col">Date</th>
+                <th scope="col">Payee</th>
+                <th scope="col">Account</th>
+                <th scope="col">Category</th>
+                <th scope="col">Status</th>
+                <th scope="col" className="num">
+                  Amount
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {dateGroups.map((group) => {
+                const groupIds = group.items.map(
+                  (row) => row.transaction.ynabId,
+                );
+                const selectedInGroup = groupIds.filter((id) =>
+                  selectedLive.has(id),
+                ).length;
+                const allGroupSelected =
+                  groupIds.length > 0 && selectedInGroup === groupIds.length;
+                return (
+                  <InboxDateFragment
+                    key={group.key}
+                    dateLabel={formatFriendlyDate(group.date)}
+                    isoDate={group.date}
+                    count={group.items.length}
+                    selectedInGroup={selectedInGroup}
+                    allGroupSelected={allGroupSelected}
+                    onSelectGroup={() => selectGroup(groupIds)}
+                    rows={group.items.map((row, idx) => {
+                      const t = row.transaction;
+                      const acct = data.accounts.find(
+                        (a) => a.ynabId === t.accountId,
+                      );
+                      const isSel = selectedLive.has(t.ynabId);
+                      const isFirst = idx === 0;
+                      const isLast = idx === group.items.length - 1;
+                      const payee = resolvePayee(data, t);
+                      const maps = mapsLinkForTxn(t, payee);
+                      return (
+                        <tr
+                          key={t.ynabId}
+                          className={[
+                            'inbox-tr',
+                            isSel ? 'is-selected' : '',
+                            isFirst ? 'is-group-first' : '',
+                            isLast ? 'is-group-last' : '',
+                            row.sisterPair ? 'inbox-tr--sister' : '',
+                            row.sisterStart ? 'is-sister-start' : '',
+                            row.sisterEnd ? 'is-sister-end' : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
+                          style={
+                            {
+                              '--rail-color': row.railColor,
+                            } as CSSProperties
+                          }
                           onClick={(e) => {
-                            // Shift+click on the row selects a range (same as checkbox).
                             if (onRowShiftSelect(t.ynabId, e)) return;
+                            // Ignore clicks on interactive controls.
+                            const el = e.target as HTMLElement;
+                            if (
+                              el.closest(
+                                'input, a, button, label, .inbox-check',
+                              )
+                            ) {
+                              return;
+                            }
                             setDetailId(t.ynabId);
                           }}
                         >
-                          <div className="inbox-main">
-                            <div className="row-title">
-                              {resolvePayee(data, t)}
+                          <td className="inbox-td-check" onClick={(e) => e.stopPropagation()}>
+                            <label className="inbox-check">
+                              <input
+                                type="checkbox"
+                                checked={isSel}
+                                onChange={(e) =>
+                                  onCheckboxChange(t.ynabId, e.target.checked)
+                                }
+                                onClick={(e) => onCheckboxClick(t.ynabId, e)}
+                                aria-label={
+                                  isSel
+                                    ? `Deselect ${payee}`
+                                    : `Select ${payee}`
+                                }
+                              />
+                            </label>
+                          </td>
+                          <td
+                            className="mono inbox-td-date"
+                            title={t.date}
+                          >
+                            <span className="inbox-date-friendly">
+                              {formatFriendlyDate(t.date)}
+                            </span>
+                            <span className="inbox-date-iso muted">
+                              {t.date}
+                            </span>
+                          </td>
+                          <td
+                            className="inbox-td-payee"
+                            title={
+                              [payee, t.memo, t.locationDisplay]
+                                .filter(Boolean)
+                                .join(' · ') || undefined
+                            }
+                          >
+                            <span className="inbox-payee-line">
+                              {payee}
                               {row.sisterEnd && (
-                                <span className="sister-badge muted small">
+                                <span className="sister-badge muted">
                                   {' '}
-                                  · cancels pair
+                                  · pair
                                 </span>
                               )}
-                            </div>
-                            <div className="inbox-meta">
-                              <CategoryChip chip={row.chip} />
-                              <span className="muted small">
-                                {resolveAccountName(acct)} ·{' '}
-                                {formatTxnStatus(t.approved !== false)}
-                                {t.locationDisplay
-                                  ? ` · ${t.locationDisplay}`
-                                  : t.plaidPfc
-                                    ? ` · ${t.plaidPfc}`
-                                    : ''}
-                                {(() => {
-                                  const maps = mapsLinkForTxn(
-                                    t,
-                                    resolvePayee(data, t),
-                                  );
-                                  if (!maps) return null;
-                                  return (
-                                    <>
-                                      {' · '}
-                                      <a
-                                        className="maps-link"
-                                        href={maps}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        onClick={(e) => e.stopPropagation()}
-                                        title="Open place on Google Maps"
-                                      >
-                                        Maps
-                                      </a>
-                                    </>
-                                  );
-                                })()}
-                              </span>
-                            </div>
-                            {t.memo && (
-                              <div className="muted small">{t.memo}</div>
-                            )}
-                          </div>
-                          <div className={`mono ${moneyClass(t.amount)}`}>
+                              {maps ? (
+                                <>
+                                  {' '}
+                                  <a
+                                    className="maps-link"
+                                    href={maps}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    title="Open place on Google Maps"
+                                  >
+                                    Maps
+                                  </a>
+                                </>
+                              ) : null}
+                            </span>
+                          </td>
+                          <td
+                            className="inbox-td-account muted"
+                            title={resolveAccountName(acct)}
+                          >
+                            {resolveAccountName(acct)}
+                          </td>
+                          <td className="inbox-td-category">
+                            <CategoryChip chip={row.chip} />
+                          </td>
+                          <td className="inbox-td-status muted">
+                            {formatTxnStatus(t.approved !== false)}
+                          </td>
+                          <td
+                            className={`num mono inbox-td-amount ${moneyClass(t.amount)}`}
+                          >
                             {formatMoney(
                               t.amount,
                               data.plan.currency || 'USD',
                               { sign: true },
                             )}
-                          </div>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            );
-          })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  />
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -484,6 +516,53 @@ export function InboxPage() {
         />
       )}
     </div>
+  );
+}
+
+/** Compact day band + spreadsheet rows (Fragment so rows stay in one <tbody>). */
+function InboxDateFragment({
+  dateLabel,
+  isoDate,
+  count,
+  selectedInGroup,
+  allGroupSelected,
+  onSelectGroup,
+  rows,
+}: {
+  dateLabel: string;
+  isoDate: string;
+  count: number;
+  selectedInGroup: number;
+  allGroupSelected: boolean;
+  onSelectGroup: () => void;
+  rows: ReactNode[];
+}) {
+  return (
+    <>
+      <tr className="inbox-day-row">
+        <td colSpan={7}>
+          <div className="inbox-day-band">
+            <span className="inbox-date-label" title={isoDate}>
+              {dateLabel}
+            </span>
+            <span className="muted small">
+              {count}
+              {selectedInGroup > 0 && selectedInGroup < count
+                ? ` · ${selectedInGroup} selected`
+                : ''}
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm inbox-cat-select"
+              onClick={onSelectGroup}
+            >
+              {allGroupSelected ? 'Deselect' : 'Select'}
+            </button>
+          </div>
+        </td>
+      </tr>
+      {rows}
+    </>
   );
 }
 
