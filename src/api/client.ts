@@ -179,6 +179,21 @@ export const ledgerApi = {
 // ── Bank connectors (Plaid — BoA, Chase, …) ───────────────────────────
 export type ConnectorId = 'boa' | 'chase' | 'vanguard' | 'venmo';
 
+/** Cached Plaid account row on CONNECTOR meta (no live Plaid for Accounts). */
+export type ConnectorAccountPreview = {
+  accountId: string;
+  name: string;
+  officialName?: string | null;
+  mask?: string | null;
+  type?: string | null;
+  subtype?: string | null;
+  /** Plaid available balance (preferred for display). */
+  available?: number | null;
+  current?: number | null;
+  limit?: number | null;
+  isoCurrencyCode?: string | null;
+};
+
 export type ConnectorStatus = {
   connectorId?: ConnectorId | string;
   /** Owner email — each household member has their own bank links. */
@@ -194,13 +209,9 @@ export type ConnectorStatus = {
   connectedBy?: string | null;
   institutionName?: string;
   accountCount?: number | null;
-  accountsPreview?: Array<{
-    accountId: string;
-    name: string;
-    mask?: string | null;
-    type?: string | null;
-    subtype?: string | null;
-  }>;
+  accountsPreview?: ConnectorAccountPreview[];
+  /** When balances were last written to connector cache. */
+  lastBalancesAt?: number | null;
   note?: string;
 };
 
@@ -239,9 +250,27 @@ export type ConnectorAccounts = {
   email?: string;
   institutionName?: string;
   itemId?: string | null;
+  connected?: boolean;
   accounts: ConnectorAccount[];
+  accountsPreview?: ConnectorAccountPreview[];
+  lastBalancesAt?: number | null;
   importTransactionsToDdb: boolean;
   source?: string;
+};
+
+export type ConnectorRefreshBalances = {
+  ok: boolean;
+  email?: string;
+  refreshedAt?: number;
+  results: Array<{
+    connectorId: string;
+    ok?: boolean;
+    skipped?: boolean;
+    reason?: string;
+    accountCount?: number;
+    lastBalancesAt?: number;
+    error?: string;
+  }>;
 };
 
 /** @deprecated use ConnectorAccounts */
@@ -285,8 +314,17 @@ export const connectorsApi = {
       public_token: publicToken,
       metadata,
     }),
-  accounts: (bank: ConnectorId | string) =>
-    get<ConnectorAccounts>(`/v1/connectors/${bank}/accounts`),
+  /**
+   * Accounts for a bank. Default = connector DDB cache (no Plaid).
+   * Pass live:true to probe Plaid and refresh the cache.
+   */
+  accounts: (bank: ConnectorId | string, opts?: { live?: boolean }) =>
+    get<ConnectorAccounts>(
+      `/v1/connectors/${bank}/accounts${opts?.live ? '?live=1' : ''}`,
+    ),
+  /** Probe every connected bank for this user → update balance cache. */
+  refreshBalances: () =>
+    post<ConnectorRefreshBalances>('/v1/connectors/refresh-balances', {}),
   disconnect: (bank: ConnectorId | string) =>
     post<{
       ok: boolean;

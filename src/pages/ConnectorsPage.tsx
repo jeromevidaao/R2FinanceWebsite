@@ -146,15 +146,39 @@ export function ConnectorsPage() {
       }
       setStatuses(next);
 
+      // Accounts from connector DDB cache only — no live Plaid on page load.
+      // Explicit "Probe accounts" / Accounts "Refresh balances" hit Plaid.
       const acctNext: Partial<Record<ConnectorId, ConnectorAccounts>> = {};
       for (const id of CONNECTOR_IDS) {
-        if (next[id]?.connected) {
-          try {
-            acctNext[id] = await connectorsApi.accounts(id);
-          } catch {
-            /* probe optional on load */
-          }
-        }
+        const st = next[id];
+        if (!st?.connected) continue;
+        const preview = st.accountsPreview || [];
+        if (preview.length === 0) continue;
+        acctNext[id] = {
+          ok: true,
+          connectorId: id,
+          email: st.email,
+          institutionName: st.institutionName || st.institution,
+          itemId: st.itemId,
+          accounts: preview.map((p) => ({
+            accountId: p.accountId,
+            name: p.name,
+            officialName: p.officialName,
+            mask: p.mask,
+            type: p.type,
+            subtype: p.subtype,
+            balances: {
+              available: p.available ?? null,
+              current: p.current ?? null,
+              limit: p.limit ?? null,
+              isoCurrencyCode: p.isoCurrencyCode || 'USD',
+            },
+          })),
+          accountsPreview: preview,
+          lastBalancesAt: st.lastBalancesAt,
+          importTransactionsToDdb: false,
+          source: 'connector_cache',
+        };
       }
       setAccountsByBank(acctNext);
 
@@ -298,11 +322,13 @@ export function ConnectorsPage() {
     setBusy(true);
     setMsg(null);
     try {
-      const a = await connectorsApi.accounts(bank);
+      // Live Plaid accounts/get — writes balances onto CONNECTOR cache.
+      const a = await connectorsApi.accounts(bank, { live: true });
       setAccountsByBank((prev) => ({ ...prev, [bank]: a }));
       setMsg(
-        `Probed ${a.accounts.length} ${a.institutionName || bank} account(s) live from Plaid.`,
+        `Probed ${a.accounts.length} ${a.institutionName || bank} account(s) live from Plaid (cache updated).`,
       );
+      await load();
     } catch (e) {
       setMsg(`Probe failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -320,9 +346,9 @@ export function ConnectorsPage() {
         <div>
           <h1>Connectors</h1>
           <p className="muted">
-            Per-person bank links (BoA, Chase, Vanguard, Venmo). Each household
-            member connects their own accounts — access only, nothing written
-            to the DDB ledger yet.
+            Per-person bank links (BoA, Chase, Vanguard, Venmo). Link access for
+            transaction match + available balances. Accounts tab reads the
+            connector cache — live Plaid only on Link / Probe / Refresh balances.
           </p>
         </div>
         <button
@@ -466,10 +492,11 @@ export function ConnectorsPage() {
             {accounts && accounts.accounts.length > 0 && (
               <div className="table-wrap" style={{ marginTop: 14 }}>
                 <h3 className="group-title" style={{ marginTop: 0 }}>
-                  Live accounts (Plaid)
+                  Accounts (available)
                 </h3>
                 <p className="muted small">
-                  Source: {accounts.source} · not stored as ledger transactions
+                  Source: {accounts.source || 'connector_cache'} · balances on
+                  connector · not ledger TXNs
                 </p>
                 <table className="data-table">
                   <thead>
