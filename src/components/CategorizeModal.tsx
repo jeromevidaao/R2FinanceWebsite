@@ -86,13 +86,16 @@ export function CategorizeModal({
   }, [data, q]);
 
   /**
-   * Optimistic: patch local cache + close immediately so the next item is
-   * reachable right away. Persist + YNAB push run in the background.
+   * Super-fast path:
+   * 1. Patch local cache → Categorization list drops rows (no HTTP)
+   * 2. Close modal → back on the same list
+   * 3. Persist + YNAB push in the background (never reloads ledger)
    */
   function pick(catId: string) {
     if (targets.length === 0) return;
     const snapshot = targets.map((t) => ({ ...t }));
     const ids = snapshot.map((t) => t.ynabId);
+    // Local remove first — UI returns to the list instantly.
     if (ids.length === 1) {
       patchTransactionCategory(ids[0], catId);
     } else {
@@ -103,7 +106,7 @@ export function CategorizeModal({
 
     void (async () => {
       try {
-        // Sequential so YNAB push stays small per call.
+        // Sequential so YNAB push stays small per call. Do not call loadLedger.
         for (const t of snapshot) {
           await ledgerApi.categorize(t.ynabId, catId, true);
         }
@@ -211,8 +214,8 @@ export function CategorizeModal({
           ))}
         </div>
         <p className="muted small">
-          Closes immediately · saves to R2Finance + YNAB in the background.
-          Same category applies to every selected transaction.
+          Tap a category to return to the list instantly. Saves in the
+          background — same category for every selected transaction.
         </p>
       </div>
     </div>

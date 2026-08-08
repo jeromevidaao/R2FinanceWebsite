@@ -133,7 +133,7 @@ export function BudgetPage() {
             </p>
           </div>
           <Link to="/inbox" className="btn btn-primary">
-            Open Spending
+            Open Categorization
           </Link>
         </section>
       )}

@@ -87,23 +87,26 @@ export function InboxPage() {
     setSelected(new Set());
   }
 
-  async function approveSelected() {
+  function approveSelected() {
     if (selectedTxns.length === 0 || busy) return;
-    setBusy(true);
-    setBanner(null);
-    try {
-      const ids = selectedTxns.map((t) => t.ynabId);
-      for (const id of ids) {
-        await ledgerApi.approve(id, true);
+    const ids = selectedTxns.map((t) => t.ynabId);
+    // Local remove first — stay on this list, no full ledger refresh.
+    patchTransactionApproved(ids);
+    clearSelection();
+    setBanner(`Approved ${ids.length}`);
+    void (async () => {
+      try {
+        for (const id of ids) {
+          await ledgerApi.approve(id, true);
+        }
+      } catch (e) {
+        setBanner(
+          e instanceof Error
+            ? `Approve save failed: ${e.message}`
+            : `Approve save failed: ${String(e)}`,
+        );
       }
-      patchTransactionApproved(ids);
-      clearSelection();
-      setBanner(`Approved ${ids.length}`);
-    } catch (e) {
-      setBanner(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
+    })();
   }
 
   if (loading && !data) return <Loading />;
@@ -130,8 +133,8 @@ export function InboxPage() {
             {hasSelection
               ? `${selectedLive.size} selected`
               : items.length > 0
-                ? `Spending (${items.length})`
-                : 'Spending'}
+                ? `Categorization (${items.length})`
+                : 'Categorization'}
           </h1>
           <p className="muted">
             {hasSelection ? (
@@ -336,11 +339,12 @@ export function InboxPage() {
           transactions={categorizeTxns}
           onClose={() => setCategorizeIds(null)}
           onDone={() => {
+            // Local cache already dropped rows; stay on this page — no refresh().
             clearSelection();
             setBanner(
               categorizeTxns.length > 1
-                ? `Categorized ${categorizeTxns.length} · saving…`
-                : 'Categorized · saving…',
+                ? `Categorized ${categorizeTxns.length}`
+                : null,
             );
           }}
           onBackgroundError={(message) => setBanner(message)}
