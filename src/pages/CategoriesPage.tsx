@@ -5,6 +5,7 @@ import { ErrorPanel, Loading } from '../components/Loading';
 import { useLedger } from '../hooks/useLedger';
 import {
   isAssignableCategory,
+  mergeCategoriesFromServer,
   removeCategoryLocal,
   upsertCategoryLocal,
 } from '../lib/dataStore';
@@ -67,6 +68,16 @@ export function CategoriesPage() {
       .filter((s) => s.cats.length > 0 || (!needle && isAssignableCategory(s.group.name, '')));
   }, [data, q]);
 
+  /** After mutation: optimistic local + authoritative category list (heal races). */
+  async function refreshCategoriesFromServer() {
+    try {
+      const live = await ledgerApi.categories();
+      mergeCategoriesFromServer(live.categories || [], live.groups || []);
+    } catch {
+      // Optimistic upsert/remove already applied; next ledger sync will heal.
+    }
+  }
+
   async function handleCreate(name: string, categoryGroupId: string) {
     setErr(null);
     setMsg(null);
@@ -74,6 +85,7 @@ export function CategoriesPage() {
     try {
       const res = await ledgerApi.createCategory(name, categoryGroupId);
       if (res.category) upsertCategoryLocal(res.category);
+      await refreshCategoriesFromServer();
       setMsg(`Created “${res.category?.name || name}” in R2Finance + YNAB`);
       setEditor(null);
     } catch (e) {
@@ -93,6 +105,7 @@ export function CategoriesPage() {
     try {
       const res = await ledgerApi.updateCategory(ynabId, body);
       if (res.category) upsertCategoryLocal(res.category);
+      await refreshCategoriesFromServer();
       setMsg(`Updated “${res.category?.name || body.name || 'category'}” in R2Finance + YNAB`);
       setEditor(null);
     } catch (e) {
@@ -113,6 +126,7 @@ export function CategoriesPage() {
     try {
       const res = await ledgerApi.deleteCategory(c.ynabId);
       removeCategoryLocal(c.ynabId);
+      await refreshCategoriesFromServer();
       if (res.ynab) {
         setMsg(`Deleted “${c.name}” from R2Finance + YNAB`);
       } else {

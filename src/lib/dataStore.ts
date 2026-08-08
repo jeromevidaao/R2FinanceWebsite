@@ -35,8 +35,23 @@ type Listener = () => void;
 let cache: LedgerData | null = null;
 let meta: LedgerMeta | null = null;
 let loading: Promise<LedgerData> | null = null;
+/** Bumps on every network load start; stale loads must not persist. */
+let loadSeq = 0;
 let bootstrapped = false;
 const listeners = new Set<Listener>();
+
+/**
+ * Category create/update/delete can race an in-flight full or delta ledger
+ * sync. Multi-page full packs read CAT# on page 0, then spend seconds paging
+ * TXN#; if create lands after that query, the finishing pack lacks the new
+ * category and `fromFullPack` would wipe the optimistic upsert. Cursor would
+ * also advance past the new row’s updatedAt, so later deltas never re-send it.
+ *
+ * Pending patches re-apply after every network merge until the server pack
+ * itself includes (or omits, for deletes) the mutation.
+ */
+const pendingCategoryUpserts = new Map<string, Category>();
+const pendingCategoryDeletes = new Set<string>();
 
 export function subscribe(fn: Listener): () => void {
   listeners.add(fn);
@@ -47,6 +62,71 @@ export function subscribe(fn: Listener): () => void {
 
 function notify() {
   listeners.forEach((fn) => fn());
+}
+
+/**
+ * Re-apply local category mutations that have not yet been confirmed by an
+ * *incoming* ledger pack (not the merged cache).
+ *
+ * Confirm only from pack ids:
+ * - upsert settled when pack lists that category id
+ * - delete settled on full pack when id is absent, or delta tombstone
+ *
+ * Do not confirm from GET /v1/categories merges — an older multi-page full
+ * pack can still finish afterward without the new row.
+ * Exported for unit tests.
+ */
+export function applyPendingCategoryMutations(
+  data: LedgerData,
+  opts: {
+    /** Live category ids from the incoming pack (excludes deleted tombstones). */
+    packCategoryIds?: Set<string>;
+    /** True when the pack is a full category snapshot. */
+    fullPack?: boolean;
+    /** Category ids tombstoned in a delta pack. */
+    packDeletedIds?: Set<string>;
+  } = {},
+): LedgerData {
+  if (pendingCategoryUpserts.size === 0 && pendingCategoryDeletes.size === 0) {
+    return data;
+  }
+
+  if (opts.packCategoryIds) {
+    for (const id of [...pendingCategoryUpserts.keys()]) {
+      if (opts.packCategoryIds.has(id)) pendingCategoryUpserts.delete(id);
+    }
+    if (opts.fullPack) {
+      for (const id of [...pendingCategoryDeletes]) {
+        if (!opts.packCategoryIds.has(id)) pendingCategoryDeletes.delete(id);
+      }
+    }
+  }
+  if (opts.packDeletedIds) {
+    for (const id of [...pendingCategoryDeletes]) {
+      if (opts.packDeletedIds.has(id)) pendingCategoryDeletes.delete(id);
+    }
+  }
+
+  if (pendingCategoryUpserts.size === 0 && pendingCategoryDeletes.size === 0) {
+    return data;
+  }
+
+  let categories = data.categories.filter(
+    (c) => !pendingCategoryDeletes.has(c.ynabId),
+  );
+  for (const cat of pendingCategoryUpserts.values()) {
+    if (pendingCategoryDeletes.has(cat.ynabId)) continue;
+    const i = categories.findIndex((c) => c.ynabId === cat.ynabId);
+    if (i >= 0) categories[i] = { ...categories[i], ...cat };
+    else categories.push(cat);
+  }
+  return { ...data, categories };
+}
+
+/** Test / reset helper — clears pending category mutation queues. */
+export function clearPendingCategoryMutations(): void {
+  pendingCategoryUpserts.clear();
+  pendingCategoryDeletes.clear();
 }
 
 export function getCache(): LedgerData | null {
@@ -218,7 +298,8 @@ export async function loadLedger(
   if (cache && !force) return cache;
   if (loading && !force) return loading;
 
-  loading = (async () => {
+  const seq = ++loadSeq;
+  const myLoad = (async () => {
     // 1) Disk hydrate so Home/Spending paint without waiting on AWS.
     if (!bootstrapped) {
       bootstrapped = true;
@@ -281,6 +362,27 @@ export async function loadLedger(
       }
     }
 
+    // 3b) Keep just-created/edited categories through in-flight full/delta races.
+    // Settle pending only from *this pack's* category ids (not merged cache).
+    const packCats = pack.categories || [];
+    const packCategoryIds = new Set(
+      packCats.filter((c) => !c.deleted).map((c) => c.ynabId),
+    );
+    const packDeletedIds = new Set(
+      packCats.filter((c) => c.deleted).map((c) => c.ynabId),
+    );
+    next = applyPendingCategoryMutations(next, {
+      packCategoryIds,
+      fullPack: pack.mode === 'full' || fullDue,
+      packDeletedIds,
+    });
+
+    // Newer load or local category mutation superseded this pack — do not
+    // persist (would wipe optimistic creates). Prefer live cache when present.
+    if (seq !== loadSeq) {
+      return cache ?? next;
+    }
+
     // 4) If local still far below server txn total, force full next open.
     const serverTxnTotal = stats?.byType?.transaction ?? 0;
     const localTxnTotal = next.transactions.length;
@@ -301,10 +403,11 @@ export async function loadLedger(
     return next;
   })();
 
+  loading = myLoad;
   try {
-    return await loading;
+    return await myLoad;
   } finally {
-    loading = null;
+    if (loading === myLoad) loading = null;
   }
 }
 
@@ -373,11 +476,23 @@ export function patchAccountFields(
 
 /** Upsert one category in the local cache (after create/update). */
 export function upsertCategoryLocal(cat: Category): void {
+  const clean: Category = {
+    ynabId: cat.ynabId,
+    name: cat.name,
+    categoryGroupId: cat.categoryGroupId ?? null,
+    hidden: cat.hidden ?? false,
+    color: cat.color ?? null,
+  };
+  pendingCategoryUpserts.set(clean.ynabId, clean);
+  pendingCategoryDeletes.delete(clean.ynabId);
+  // Invalidate in-flight ledger loads so a pack that started before this
+  // mutation cannot persist and wipe the optimistic update.
+  loadSeq += 1;
   if (!cache) return;
   const categories = [...cache.categories];
-  const i = categories.findIndex((c) => c.ynabId === cat.ynabId);
-  if (i >= 0) categories[i] = { ...categories[i], ...cat };
-  else categories.push(cat);
+  const i = categories.findIndex((c) => c.ynabId === clean.ynabId);
+  if (i >= 0) categories[i] = { ...categories[i], ...clean };
+  else categories.push(clean);
   cache = { ...cache, categories };
   notify();
   void saveSnapshot(cache);
@@ -385,11 +500,58 @@ export function upsertCategoryLocal(cat: Category): void {
 
 /** Remove a category from the local cache (after delete). */
 export function removeCategoryLocal(ynabId: string): void {
+  pendingCategoryDeletes.add(ynabId);
+  pendingCategoryUpserts.delete(ynabId);
+  loadSeq += 1;
   if (!cache) return;
   cache = {
     ...cache,
     categories: cache.categories.filter((c) => c.ynabId !== ynabId),
   };
+  notify();
+  void saveSnapshot(cache);
+}
+
+/**
+ * Merge an authoritative GET /v1/categories snapshot into the local cache.
+ * Used after create/update/delete so categorize pickers see the new set even
+ * when a concurrent ledger full-pack was still mid-flight.
+ */
+export function mergeCategoriesFromServer(
+  categories: Category[],
+  groups?: CategoryGroup[],
+): void {
+  if (!cache) return;
+  const nextCats = categories.map((c) => ({
+    ynabId: c.ynabId,
+    name: c.name,
+    categoryGroupId: c.categoryGroupId ?? null,
+    hidden: c.hidden ?? false,
+    color: c.color ?? null,
+  }));
+
+  let nextGroups = cache.groups;
+  if (groups?.length) {
+    const gMap = new Map(cache.groups.map((g) => [g.ynabId, g]));
+    for (const g of groups) {
+      gMap.set(g.ynabId, {
+        ynabId: g.ynabId,
+        name: g.name,
+        hidden: g.hidden ?? false,
+      });
+    }
+    nextGroups = Array.from(gMap.values());
+  }
+
+  // Do not confirm/clear pending here — an older multi-page full pack may still
+  // finish without the new category and needs pending to re-apply.
+  let next: LedgerData = {
+    ...cache,
+    groups: nextGroups,
+    categories: nextCats,
+  };
+  next = applyPendingCategoryMutations(next);
+  cache = next;
   notify();
   void saveSnapshot(cache);
 }
