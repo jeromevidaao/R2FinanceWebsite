@@ -15,10 +15,8 @@ export function BudgetPage() {
 
   const summary = useMemo(() => {
     if (!data) return null;
-    const onBudget = data.accounts.filter((a) => a.onBudget && !a.closed);
-    const tracking = data.accounts.filter((a) => !a.onBudget && !a.closed);
-    const budgetTotal = onBudget.reduce((s, a) => s + a.balance, 0);
-    const trackingTotal = tracking.reduce((s, a) => s + a.balance, 0);
+    const openAccounts = data.accounts.filter((a) => !a.closed);
+    const accountsTotal = openAccounts.reduce((s, a) => s + a.balance, 0);
     const inbox = data.transactions.filter((t) => isInboxTxn(t, data));
     const thisMonth = monthKey(new Date().toISOString().slice(0, 10));
     const monthTxns = data.transactions.filter(
@@ -54,10 +52,8 @@ export function BudgetPage() {
       });
 
     return {
-      budgetTotal,
-      trackingTotal,
-      onBudget,
-      tracking,
+      accountsTotal,
+      openCount: openAccounts.length,
       inbox,
       thisMonth,
       inflow,
@@ -93,22 +89,11 @@ export function BudgetPage() {
 
       <div className="stat-grid">
         <div className="stat-card">
-          <div className="stat-label">On budget</div>
-          <div className={`stat-value ${moneyClass(summary.budgetTotal)}`}>
-            {formatMoney(summary.budgetTotal)}
+          <div className="stat-label">Accounts</div>
+          <div className={`stat-value ${moneyClass(summary.accountsTotal)}`}>
+            {formatMoney(summary.accountsTotal)}
           </div>
-          <div className="muted small">
-            {summary.onBudget.length} accounts
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Tracking</div>
-          <div className={`stat-value ${moneyClass(summary.trackingTotal)}`}>
-            {formatMoney(summary.trackingTotal)}
-          </div>
-          <div className="muted small">
-            {summary.tracking.length} accounts
-          </div>
+          <div className="muted small">{summary.openCount} open</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Inflow (month)</div>
@@ -120,6 +105,12 @@ export function BudgetPage() {
           <div className="stat-label">Outflow (month)</div>
           <div className={`stat-value ${moneyClass(summary.outflow)}`}>
             {formatMoney(summary.outflow)}
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Net (month)</div>
+          <div className={`stat-value ${moneyClass(summary.net)}`}>
+            {formatMoney(summary.net)}
           </div>
         </div>
       </div>
