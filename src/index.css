@@ -348,6 +348,8 @@ select {
   border-bottom: 1px solid var(--border);
   color: inherit;
   text-decoration: none;
+  /* Avoid blue text highlight when Shift+clicking for range select. */
+  user-select: none;
 }
 .account-row:hover {
   background: rgba(255, 255, 255, 0.03);

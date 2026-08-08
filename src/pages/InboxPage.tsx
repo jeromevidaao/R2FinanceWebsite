@@ -1,4 +1,10 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import {
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { CategorizeModal } from '../components/CategorizeModal';
 import { CategoryChip } from '../components/CategoryChip';
 import { ErrorPanel, Loading } from '../components/Loading';
@@ -31,6 +37,8 @@ export function InboxPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
+  /** Anchor for Shift+click range select (visual list order). */
+  const lastAnchorIdRef = useRef<string | null>(null);
 
   const items = useMemo(() => {
     if (!data) return [];
@@ -43,6 +51,12 @@ export function InboxPage() {
     if (!data) return [];
     return groupInboxByCategory(data, items);
   }, [data, items]);
+
+  /** Flat ynabIds in on-screen order (groups top→bottom, rows top→bottom). */
+  const orderedIds = useMemo(
+    () => categoryGroups.flatMap((g) => g.transactions.map((t) => t.ynabId)),
+    [categoryGroups],
+  );
 
   // Drop selections that left the inbox.
   const liveIds = useMemo(() => new Set(items.map((t) => t.ynabId)), [items]);
@@ -72,8 +86,50 @@ export function InboxPage() {
     });
   }
 
+  /**
+   * Checkbox / row select:
+   * - plain click → toggle one row, set Shift anchor
+   * - Shift+click → select every row between last anchor and this id
+   *   (inclusive), in visual list order
+   */
+  function selectWithModifiers(
+    id: string,
+    e: { shiftKey: boolean; preventDefault?: () => void },
+  ) {
+    if (e.shiftKey && lastAnchorIdRef.current) {
+      e.preventDefault?.();
+      const anchor = lastAnchorIdRef.current;
+      const a = orderedIds.indexOf(anchor);
+      const b = orderedIds.indexOf(id);
+      if (a >= 0 && b >= 0) {
+        const lo = Math.min(a, b);
+        const hi = Math.max(a, b);
+        const range = orderedIds.slice(lo, hi + 1);
+        setSelected((prev) => {
+          const next = new Set(prev);
+          for (const rid of range) next.add(rid);
+          return next;
+        });
+        return;
+      }
+    }
+    toggle(id);
+    lastAnchorIdRef.current = id;
+  }
+
+  function onCheckboxClick(
+    id: string,
+    e: ReactMouseEvent<HTMLInputElement>,
+  ) {
+    // Controlled checkbox: drive selection ourselves so Shift works.
+    e.preventDefault();
+    selectWithModifiers(id, e);
+  }
+
   function selectAll() {
     setSelected(new Set(items.map((t) => t.ynabId)));
+    lastAnchorIdRef.current =
+      orderedIds[orderedIds.length - 1] ?? items[0]?.ynabId ?? null;
   }
 
   function selectGroup(ids: string[]) {
@@ -84,6 +140,7 @@ export function InboxPage() {
         for (const id of ids) next.delete(id);
       } else {
         for (const id of ids) next.add(id);
+        lastAnchorIdRef.current = ids[ids.length - 1] ?? lastAnchorIdRef.current;
       }
       return next;
     });
@@ -91,6 +148,7 @@ export function InboxPage() {
 
   function clearSelection() {
     setSelected(new Set());
+    lastAnchorIdRef.current = null;
   }
 
   function approveSelected() {
@@ -154,8 +212,8 @@ export function InboxPage() {
               </>
             ) : (
               <>
-                Sister pairs (cancel out) · grouped by category · approve
-                works without a category
+                Sister pairs (cancel out) · grouped by category · Shift+click
+                for range select · approve works without a category
               </>
             )}
           </p>
@@ -267,13 +325,29 @@ export function InboxPage() {
                           <input
                             type="checkbox"
                             checked={isSel}
-                            onChange={() => toggle(t.ynabId)}
+                            onClick={(e) => onCheckboxClick(t.ynabId, e)}
+                            onChange={() => {
+                              /* selection handled in onClick (Shift range) */
+                            }}
+                            aria-label={
+                              isSel
+                                ? `Deselect ${resolvePayee(data, t)}`
+                                : `Select ${resolvePayee(data, t)}`
+                            }
                           />
                         </label>
                         <button
                           type="button"
                           className="inbox-main-btn"
-                          onClick={() => setDetailId(t.ynabId)}
+                          onClick={(e) => {
+                            // Shift+click on the row selects a range (same as checkbox).
+                            if (e.shiftKey) {
+                              e.preventDefault();
+                              selectWithModifiers(t.ynabId, e);
+                              return;
+                            }
+                            setDetailId(t.ynabId);
+                          }}
                         >
                           <div className="inbox-main">
                             <div className="row-title">
