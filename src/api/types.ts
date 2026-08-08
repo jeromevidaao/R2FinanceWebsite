@@ -17,10 +17,15 @@ export interface Account {
   note?: string | null;
   transferPayeeId?: string | null;
   /**
-   * User nickname (R2Finance-only). Prefer this over `name` in Categorization
-   * and the rest of the UI via resolveAccountName.
+   * Display nickname (R2Finance-only). Seeded from YNAB account `name` until
+   * the user saves a custom value. Prefer over `name` via resolveAccountName.
    */
   alias?: string | null;
+  /**
+   * true when the user saved a custom nickname (survives YNAB renames).
+   * false / missing means the alias is (or will be) mirrored from YNAB name.
+   */
+  aliasUserSet?: boolean;
   /** Last-4 digits when present in the YNAB account name. */
   mask?: string | null;
 }

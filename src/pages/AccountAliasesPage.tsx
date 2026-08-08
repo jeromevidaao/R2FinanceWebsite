@@ -18,12 +18,14 @@ import { formatMoney, moneyClass } from '../lib/money';
 
 /**
  * Ledger account nicknames used across Categorization, transfers, filters.
- * YNAB name + last-4 stay visible; alias is R2Finance-only (not pushed to YNAB).
+ * Pre-seeded from YNAB account names (GET /plans/…/accounts → name; YNAB has
+ * no separate alias field). Edits stay in R2Finance only — never pushed back.
  */
 export function AccountAliasesPage() {
   const { data, loading, error, refresh } = useLedger();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [seeding, setSeeding] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [q, setQ] = useState('');
@@ -84,6 +86,7 @@ export function AccountAliasesPage() {
       const saved = res.account;
       patchAccountFields(a.ynabId, {
         alias: saved.alias ?? null,
+        aliasUserSet: saved.aliasUserSet ?? !!alias,
         mask: saved.mask ?? extractAccountMask(saved.name || a.name),
       });
       setDrafts((d) => {
@@ -94,12 +97,32 @@ export function AccountAliasesPage() {
       setMsg(
         alias
           ? `Saved alias “${alias}” for ${a.name}`
-          : `Cleared alias for ${a.name}`,
+          : `Cleared custom alias for ${a.name} (will re-seed from YNAB on next sync)`,
       );
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function seedFromYnab() {
+    setSeeding(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      const report = await ledgerApi.seedAccountAliases();
+      setDrafts({});
+      await refresh(true);
+      setMsg(
+        report.seeded > 0
+          ? `Pre-filled ${report.seeded} alias${report.seeded === 1 ? '' : 'es'} from YNAB names (${report.skipped} already set or skipped)`
+          : `All accounts already have aliases (${report.skipped} skipped). Edit any nickname for R2 only.`,
+      );
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSeeding(false);
     }
   }
 
@@ -112,6 +135,12 @@ export function AccountAliasesPage() {
   const withAlias = data.accounts.filter(
     (a) => !a.closed && a.alias?.trim(),
   ).length;
+  const customCount = data.accounts.filter(
+    (a) => !a.closed && a.aliasUserSet && a.alias?.trim(),
+  ).length;
+  const missingAlias = data.accounts.filter(
+    (a) => !a.closed && !(a.alias || '').trim(),
+  ).length;
 
   return (
     <div className="page">
@@ -120,23 +149,40 @@ export function AccountAliasesPage() {
           <h1>Account aliases</h1>
           <p className="muted">
             Nicknames for every ledger account — reused in Categorization,
-            transfers, filters, and registers. Last-4 is taken from the YNAB
-            name when present (e.g. card ending). Aliases stay in R2Finance only
-            (not written back to YNAB).
+            transfers, filters, and registers. They start from your{' '}
+            <strong>YNAB account names</strong> (pulled via the YNAB API; YNAB
+            has no separate alias field). Edit anytime for R2 only — never
+            written back to YNAB. Last-4 is taken from the YNAB name when
+            present.
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={() => void refresh(true)}
-        >
-          Refresh
-        </button>
+        <div className="btn-row">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={seeding}
+            onClick={() => void seedFromYnab()}
+            title="Fill empty aliases from current YNAB account names"
+          >
+            {seeding ? 'Seeding…' : 'Fill from YNAB names'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => void refresh(true)}
+          >
+            Refresh
+          </button>
+        </div>
       </header>
 
       <p className="muted small" style={{ marginBottom: 12 }}>
         {total} open account{total === 1 ? '' : 's'}
         {withAlias > 0 ? ` · ${withAlias} with a nickname` : ''}
+        {customCount > 0 ? ` · ${customCount} custom` : ''}
+        {missingAlias > 0
+          ? ` · ${missingAlias} still empty — use “Fill from YNAB names”`
+          : ''}
       </p>
 
       <input
@@ -184,6 +230,11 @@ export function AccountAliasesPage() {
                             {' '}
                             · YNAB: {a.name}
                           </span>
+                        ) : null}
+                        {a.aliasUserSet ? (
+                          <span className="muted small"> · custom</span>
+                        ) : a.alias?.trim() ? (
+                          <span className="muted small"> · from YNAB</span>
                         ) : null}
                       </div>
                       <div className="muted small">

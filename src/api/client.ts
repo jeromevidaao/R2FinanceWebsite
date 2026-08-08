@@ -130,12 +130,21 @@ export const ledgerApi = {
     get<{ accounts: Account[] }>('/v1/accounts').then((r) => r.accounts),
   /**
    * Set or clear a user nickname for a ledger account (not pushed to YNAB).
-   * Pass null / empty string to clear.
+   * Pass null / empty string to clear (next sync re-seeds from YNAB name).
    */
   setAccountAlias: (ynabId: string, alias: string | null) =>
     patch<{ ok: boolean; account: Account }>(
       `/v1/accounts/${encodeURIComponent(ynabId)}`,
       { alias },
+    ),
+  /**
+   * Pre-fill empty aliases from YNAB account names (pull + seed).
+   * Skips accounts where the user already saved a custom nickname.
+   */
+  seedAccountAliases: () =>
+    post<{ ok: boolean; seeded: number; skipped: number; total: number }>(
+      '/v1/accounts/seed-aliases',
+      {},
     ),
   categories: () =>
     get<{ groups: CategoryGroup[]; categories: Category[] }>('/v1/categories'),
