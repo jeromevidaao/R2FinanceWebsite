@@ -371,6 +371,29 @@ export function patchAccountFields(
   void saveSnapshot(cache);
 }
 
+/** Upsert one category in the local cache (after create/update). */
+export function upsertCategoryLocal(cat: Category): void {
+  if (!cache) return;
+  const categories = [...cache.categories];
+  const i = categories.findIndex((c) => c.ynabId === cat.ynabId);
+  if (i >= 0) categories[i] = { ...categories[i], ...cat };
+  else categories.push(cat);
+  cache = { ...cache, categories };
+  notify();
+  void saveSnapshot(cache);
+}
+
+/** Remove a category from the local cache (after delete). */
+export function removeCategoryLocal(ynabId: string): void {
+  if (!cache) return;
+  cache = {
+    ...cache,
+    categories: cache.categories.filter((c) => c.ynabId !== ynabId),
+  };
+  notify();
+  void saveSnapshot(cache);
+}
+
 export function categoryMap(data: LedgerData): Map<string, Category> {
   return new Map(data.categories.map((c) => [c.ynabId, c]));
 }

@@ -21,7 +21,7 @@ Full-scale **R2Finance** web app — YNAB-grade multi-account register, inbox, c
 | **Register** | Per-account transactions, search, clear filters, categorize |
 | **Inbox** | Uncategorized / unapproved → categorize + push |
 | **All transactions** | Cross-account search, month/account filters |
-| **Categories** | Groups + month activity |
+| **Categories** | Groups + month activity · add / edit / delete (syncs to R2Finance DDB + YNAB) |
 | **Payees** | Search + activity totals |
 | **Reports** | Month / year / all-time: inflow·outflow·net, by category / group / payee / account, % share bars, monthly + yearly income vs expense trends |
 | **More / sync** | Plan meta, stats, pull / push / tick / full import |

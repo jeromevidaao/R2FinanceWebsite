@@ -139,6 +139,41 @@ export const ledgerApi = {
     ),
   categories: () =>
     get<{ groups: CategoryGroup[]; categories: Category[] }>('/v1/categories'),
+  /**
+   * Create category in YNAB + R2Finance DDB (immediate dual-write).
+   */
+  createCategory: (name: string, categoryGroupId: string) =>
+    post<{
+      ok: boolean;
+      ynab: boolean;
+      category: Category;
+      error?: string;
+    }>('/v1/categories', { name, categoryGroupId }),
+  /**
+   * Rename and/or move category group — YNAB + DDB.
+   */
+  updateCategory: (
+    ynabId: string,
+    body: { name?: string; categoryGroupId?: string },
+  ) =>
+    patch<{
+      ok: boolean;
+      ynab: boolean;
+      category: Category;
+      error?: string;
+    }>(`/v1/categories/${encodeURIComponent(ynabId)}`, body),
+  /**
+   * Soft-delete in DDB; attempts YNAB DELETE (often unsupported by YNAB API).
+   */
+  deleteCategory: (ynabId: string) =>
+    request<{
+      ok: boolean;
+      ynabId: string;
+      ynab: boolean;
+      ynabError?: string | null;
+      warning?: string | null;
+      error?: string;
+    }>(`/v1/categories/${encodeURIComponent(ynabId)}`, { method: 'DELETE' }),
   payees: () => get<{ payees: Payee[] }>('/v1/payees').then((r) => r.payees),
   /** Authoritative needs-attention list (unapproved + uncategorized). */
   inbox: () => get<InboxResponse>('/v1/inbox'),
