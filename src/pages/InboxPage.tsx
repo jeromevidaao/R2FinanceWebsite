@@ -11,7 +11,7 @@ import {
   groupInboxByCategory,
 } from '../lib/categoryDisplay';
 import {
-  formatClearedLabel,
+  formatTxnStatus,
   isInboxTxn,
   patchTransactionApproved,
   patchTransactionFields,
@@ -270,7 +270,7 @@ export function InboxPage() {
                             <div className="inbox-meta">
                               <span className="muted small">
                                 {formatFriendlyDate(t.date)} · {acct?.name || 'Account'} ·{' '}
-                                {formatClearedLabel(t.cleared, t.approved)}
+                                {formatTxnStatus(t.approved !== false)}
                                 {t.locationDisplay
                                   ? ` · ${t.locationDisplay}`
                                   : t.plaidPfc
@@ -442,7 +442,7 @@ function TxnDetailModal({
             <h2>Transaction</h2>
             <p className="muted">
               {acct?.name || 'Account'} · {formatFriendlyDate(txn.date)} ·{' '}
-              {formatClearedLabel(txn.cleared, txn.approved)}
+              {formatTxnStatus(txn.approved !== false)}
             </p>
             <p className="muted small inbox-meta">
               Category:{' '}

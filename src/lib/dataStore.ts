@@ -549,15 +549,28 @@ export function displayCategoryLabel(
   return cat.name;
 }
 
+/**
+ * User-facing transaction **Status** = YNAB `approved`.
+ *
+ * Note: YNAB also has bank reconciliation (`cleared` / uncleared / reconciled).
+ * That is a separate field — we do **not** surface it as Status. Users treat
+ * Status as “have I approved this transaction?”
+ */
+export function formatTxnStatus(approved: boolean): string {
+  return approved ? 'Approved' : 'Needs approval';
+}
+
+/** CSS suffix for status pills: pill-approved | pill-needs-approval */
+export function txnStatusPillMod(approved: boolean): string {
+  return approved ? 'approved' : 'needs-approval';
+}
+
+/** @deprecated use formatTxnStatus — Status is approval, not bank cleared. */
 export function formatClearedLabel(
-  cleared: string,
+  _cleared: string,
   approved: boolean,
 ): string {
-  if (!approved) return 'needs approval';
-  const c = (cleared || 'uncleared').toLowerCase();
-  if (c === 'reconciled') return 'reconciled';
-  if (c === 'cleared') return 'cleared';
-  return 'uncleared';
+  return formatTxnStatus(approved);
 }
 
 export { accountTypeLabel } from './accountGroups';

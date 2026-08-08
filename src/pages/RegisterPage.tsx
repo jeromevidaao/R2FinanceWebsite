@@ -7,8 +7,10 @@ import { useLedger } from '../hooks/useLedger';
 import { categoryChipForTxn } from '../lib/categoryDisplay';
 import { formatMoney, moneyClass } from '../lib/money';
 import {
+  formatTxnStatus,
   resolveCategory,
   resolvePayee,
+  txnStatusPillMod,
   type LedgerData,
 } from '../lib/dataStore';
 import type { Transaction } from '../api/types';
@@ -17,9 +19,10 @@ export function RegisterPage() {
   const { accountId = '' } = useParams();
   const { data, loading, error, refresh } = useLedger();
   const [q, setQ] = useState('');
-  const [clearedOnly, setClearedOnly] = useState<'all' | 'cleared' | 'uncleared'>(
-    'all',
-  );
+  /** Status filter = YNAB `approved` (not bank cleared). */
+  const [approvalFilter, setApprovalFilter] = useState<
+    'all' | 'approved' | 'needs-approval'
+  >('all');
   const [target, setTarget] = useState<Transaction | null>(null);
 
   const account = data?.accounts.find((a) => a.ynabId === accountId);
@@ -27,10 +30,10 @@ export function RegisterPage() {
   const rows = useMemo(() => {
     if (!data) return [];
     let list = data.transactions.filter((t) => t.accountId === accountId);
-    if (clearedOnly === 'cleared')
-      list = list.filter((t) => t.cleared === 'cleared' || t.cleared === 'reconciled');
-    if (clearedOnly === 'uncleared')
-      list = list.filter((t) => t.cleared === 'uncleared');
+    if (approvalFilter === 'approved')
+      list = list.filter((t) => t.approved !== false);
+    if (approvalFilter === 'needs-approval')
+      list = list.filter((t) => t.approved === false);
     const needle = q.trim().toLowerCase();
     if (needle) {
       list = list.filter((t) => {
@@ -46,7 +49,7 @@ export function RegisterPage() {
       });
     }
     return list;
-  }, [data, accountId, q, clearedOnly]);
+  }, [data, accountId, q, approvalFilter]);
 
   if (loading && !data) return <Loading />;
   if (error && !data)
@@ -84,14 +87,14 @@ export function RegisterPage() {
         />
         <select
           className="input"
-          value={clearedOnly}
+          value={approvalFilter}
           onChange={(e) =>
-            setClearedOnly(e.target.value as typeof clearedOnly)
+            setApprovalFilter(e.target.value as typeof approvalFilter)
           }
         >
-          <option value="all">All cleared states</option>
-          <option value="cleared">Cleared / reconciled</option>
-          <option value="uncleared">Uncleared</option>
+          <option value="all">All statuses</option>
+          <option value="approved">Approved</option>
+          <option value="needs-approval">Needs approval</option>
         </select>
       </div>
 
@@ -187,9 +190,15 @@ export function TxnTable({
                 </td>
                 <td className="muted">{t.memo || ''}</td>
                 <td>
-                  <span className={`pill pill-${t.cleared}`}>
-                    {t.cleared}
-                    {!t.approved ? ' · pending' : ''}
+                  <span
+                    className={`pill pill-${txnStatusPillMod(t.approved !== false)}`}
+                    title={
+                      t.approved !== false
+                        ? 'Approved in R2Finance / YNAB'
+                        : 'Not approved yet — still in Categorization'
+                    }
+                  >
+                    {formatTxnStatus(t.approved !== false)}
                   </span>
                 </td>
                 <td className={`num mono ${moneyClass(outflow)}`}>

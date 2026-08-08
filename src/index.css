@@ -761,6 +761,16 @@ select {
   background: rgba(255, 255, 255, 0.06);
   color: var(--muted);
 }
+/* Status = approval (not bank cleared/uncleared) */
+.pill-approved {
+  color: var(--primary);
+  background: rgba(61, 204, 145, 0.12);
+}
+.pill-needs-approval {
+  color: var(--warn);
+  background: rgba(240, 180, 41, 0.12);
+}
+/* legacy bank-cleared pills (if any leftover) */
 .pill-cleared,
 .pill-reconciled {
   color: var(--primary);
