@@ -11,6 +11,10 @@ import {
   groupInboxByCategory,
 } from '../lib/categoryDisplay';
 import {
+  isSisterPairEnd,
+  isSisterPairStart,
+} from '../lib/sisterPairs';
+import {
   formatTxnStatus,
   isInboxTxn,
   patchTransactionApproved,
@@ -149,7 +153,8 @@ export function InboxPage() {
               </>
             ) : (
               <>
-                Grouped by category · approve works without a category
+                Sister pairs (cancel out) · grouped by category · approve
+                works without a category
               </>
             )}
           </p>
@@ -232,6 +237,9 @@ export function InboxPage() {
                     const isSel = selectedLive.has(t.ynabId);
                     const isFirst = idx === 0;
                     const isLast = idx === group.transactions.length - 1;
+                    const isSister = !!group.sisterPairs;
+                    const pairStart = isSister && isSisterPairStart(idx);
+                    const pairEnd = isSister && isSisterPairEnd(idx);
                     return (
                       <li
                         key={t.ynabId}
@@ -241,6 +249,9 @@ export function InboxPage() {
                           isSel ? 'is-selected' : '',
                           isFirst ? 'is-group-first' : '',
                           isLast ? 'is-group-last' : '',
+                          isSister ? 'inbox-row--sister' : '',
+                          pairStart ? 'is-sister-start' : '',
+                          pairEnd ? 'is-sister-end' : '',
                         ]
                           .filter(Boolean)
                           .join(' ')}
@@ -266,10 +277,17 @@ export function InboxPage() {
                           <div className="inbox-main">
                             <div className="row-title">
                               {resolvePayee(data, t.payeeId)}
+                              {pairEnd && (
+                                <span className="sister-badge muted small">
+                                  {' '}
+                                  · cancels pair
+                                </span>
+                              )}
                             </div>
                             <div className="inbox-meta">
                               <span className="muted small">
-                                {formatFriendlyDate(t.date)} · {acct?.name || 'Account'} ·{' '}
+                                {formatFriendlyDate(t.date)} ·{' '}
+                                {acct?.name || 'Account'} ·{' '}
                                 {formatTxnStatus(t.approved !== false)}
                                 {t.locationDisplay
                                   ? ` · ${t.locationDisplay}`

@@ -521,6 +521,25 @@ select {
   border-radius: 3px;
 }
 
+/* Sister pairs: tighter within-pair, gap between pairs */
+.inbox-row--sister.is-sister-start {
+  border-bottom: none;
+  padding-bottom: 2px;
+}
+.inbox-row--sister.is-sister-end {
+  padding-top: 2px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.12);
+}
+.inbox-row--sister.is-sister-end.is-group-last {
+  margin-bottom: 4px;
+  border-bottom: none;
+}
+.sister-badge {
+  font-weight: 500;
+  opacity: 0.85;
+}
+
 .inbox-row.is-selected {
   background: rgba(61, 204, 145, 0.1);
   border-radius: 8px;
@@ -617,6 +636,11 @@ select {
   background: rgba(167, 139, 250, 0.18);
   color: #ddd6fe;
   border-color: rgba(167, 139, 250, 0.35);
+}
+.cat-chip--sister {
+  background: rgba(56, 189, 248, 0.18);
+  color: #bae6fd;
+  border-color: rgba(56, 189, 248, 0.4);
 }
 .cat-chip--airbnb {
   background: rgba(255, 90, 95, 0.18);

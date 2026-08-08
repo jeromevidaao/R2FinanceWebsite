@@ -13,12 +13,14 @@ import {
   UNCATEGORIZED_COLOR,
   isHexColor,
 } from './categoryColors';
+import { findSisterPairs, flattenSisterPairs } from './sisterPairs';
 
 export type CategoryChipKind =
   | 'needed'
   | 'inflow'
   | 'category'
   | 'transfer'
+  | 'sister'
   | 'airbnb';
 
 export type CategoryChip = {
@@ -36,6 +38,8 @@ export type CategoryChip = {
 export const AIRBNB_COLOR = '#FF5A5F';
 export const NEEDED_COLOR = '#F59E0B';
 export const TRANSFER_COLOR = '#A78BFA';
+/** Offsetting sister pairs (CC payment ↔ transfer, both legs of a transfer). */
+export const SISTER_COLOR = '#38BDF8';
 
 const ICON_RULES: { re: RegExp; icon: string }[] = [
   // Airbnb handled separately for brand logo + color.
@@ -254,26 +258,63 @@ export type InboxCategoryGroup = {
   chip: CategoryChip;
   railColor: string;
   transactions: Transaction[];
+  /**
+   * When true, transactions are ordered as sister pairs [a1,b1,a2,b2,…]
+   * (equal opposite amounts that cancel).
+   */
+  sisterPairs?: boolean;
+  /** Number of sister pairs when sisterPairs is true. */
+  pairCount?: number;
 };
 
+const SISTERS_KEY = '__sisters';
+
+function sisterPairsChip(pairCount: number): CategoryChip {
+  return {
+    label:
+      pairCount === 1
+        ? 'Sister pair · net $0'
+        : `Sister pairs · ${pairCount} · net $0`,
+    kind: 'sister',
+    icon: '⚖️',
+    railColor: SISTER_COLOR,
+  };
+}
+
 /**
- * Group unapproved/inbox rows by category for bulk approve.
- * Order: Category Needed → named categories (A–Z) → transfers.
- * Within each group: newest date first.
+ * Group unapproved/inbox rows for bulk approve.
+ * Order: Sister pairs (cancel out) → Category Needed → named categories (A–Z) → transfers.
+ * Within each category group: newest date first.
+ * Sister group: pairs listed consecutively (outflow then inflow).
  */
 export function groupInboxByCategory(
   data: LedgerData,
   items: Transaction[],
 ): InboxCategoryGroup[] {
+  const { pairs, unpaired } = findSisterPairs(items);
+  const groups: InboxCategoryGroup[] = [];
+
+  if (pairs.length > 0) {
+    const chip = sisterPairsChip(pairs.length);
+    groups.push({
+      key: SISTERS_KEY,
+      label: chip.label,
+      chip,
+      railColor: chip.railColor,
+      transactions: flattenSisterPairs(pairs),
+      sisterPairs: true,
+      pairCount: pairs.length,
+    });
+  }
+
   const map = new Map<string, Transaction[]>();
-  for (const t of items) {
+  for (const t of unpaired) {
     const key = inboxGroupKey(t);
     const list = map.get(key) || [];
     list.push(t);
     map.set(key, list);
   }
 
-  const groups: InboxCategoryGroup[] = [];
   for (const [key, txns] of map.entries()) {
     const sorted = [...txns].sort((a, b) =>
       a.date < b.date ? 1 : a.date > b.date ? -1 : 0,
@@ -291,9 +332,10 @@ export function groupInboxByCategory(
 
   groups.sort((a, b) => {
     const rank = (g: InboxCategoryGroup) => {
-      if (g.key === '__needed') return 0;
-      if (g.key.startsWith('__transfer')) return 2;
-      return 1;
+      if (g.key === SISTERS_KEY) return 0;
+      if (g.key === '__needed') return 1;
+      if (g.key.startsWith('__transfer')) return 3;
+      return 2;
     };
     const ra = rank(a);
     const rb = rank(b);
