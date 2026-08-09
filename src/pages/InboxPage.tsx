@@ -26,6 +26,7 @@ import {
 } from '../lib/dataStore';
 import type { Transaction } from '../api/types';
 import { mapsLinkForTxn } from '../lib/googleMaps';
+import { venmoDescriptionLabel } from '../lib/displayPayee';
 
 /** Ledger dates as YYYY/MM/DD only (inbox list + detail). */
 function formatInboxDate(raw: string | null | undefined): string {
@@ -34,6 +35,22 @@ function formatInboxDate(raw: string | null | undefined): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
   if (m) return `${m[1]}/${m[2]}/${m[3]}`;
   return s.replace(/-/g, '/');
+}
+
+/** e.g. Ruby BoA · 2026/06/16 · Needs approval - Richard Mondor - City bags */
+function formatInboxMetaLine(
+  account: string,
+  date: string,
+  approved: boolean,
+  txn: Transaction,
+): string {
+  const base = `${account} · ${formatInboxDate(date)} · ${formatTxnStatus(approved)}`;
+  const desc = venmoDescriptionLabel({
+    plaidDescription: txn.plaidDescription,
+    plaidName: txn.plaidName,
+    plaidMerchantName: txn.plaidMerchantName,
+  });
+  return desc ? `${base} - ${desc}` : base;
 }
 
 export function InboxPage() {
@@ -558,8 +575,12 @@ function TxnDetailModal({
           <div>
             <h2>Transaction</h2>
             <p className="muted">
-              {resolveAccountName(acct)} · {formatInboxDate(txn.date)} ·{' '}
-              {formatTxnStatus(txn.approved !== false)}
+              {formatInboxMetaLine(
+                resolveAccountName(acct),
+                txn.date,
+                txn.approved !== false,
+                txn,
+              )}
             </p>
             {(() => {
               const maps = mapsLinkForTxn(txn, payee);

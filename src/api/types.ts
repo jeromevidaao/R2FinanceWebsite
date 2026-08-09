@@ -103,6 +103,10 @@ export interface Transaction {
   /** Plaid match + location (from cloud enrich). */
   plaidTransactionId?: string | null;
   plaidMerchantName?: string | null;
+  /** Raw Plaid name (Venmo: Person "note"). */
+  plaidName?: string | null;
+  /** Venmo Personal note as "Person - note". */
+  plaidDescription?: string | null;
   plaidPaymentChannel?: string | null;
   plaidPfc?: string | null;
   matchTier?: string | null;

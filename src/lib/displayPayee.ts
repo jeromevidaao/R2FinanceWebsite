@@ -121,10 +121,44 @@ export type DisplayPayeeInput = {
   payeeName?: string | null;
   transferAccountName?: string | null;
   plaidMerchantName?: string | null;
+  plaidName?: string | null;
+  plaidDescription?: string | null;
   plaidPfc?: string | null;
   importPayeeName?: string | null;
   accounts?: Account[];
 };
+
+/** True when bank/import payee is a generic Venmo ACH label. */
+export function isGenericVenmoPayee(text?: string | null): boolean {
+  const s = String(text || '').trim();
+  if (!s) return false;
+  if (/^venmo$/i.test(s)) return true;
+  if (/^venmo\b/i.test(s) && /payment|cashout|des:|web id|ppd|orig/i.test(s)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Venmo Personal note for UI: "Person - note".
+ * Only returns Venmo-style labels (quoted note or stamped "Name - note").
+ */
+export function venmoDescriptionLabel(opts: {
+  plaidDescription?: string | null;
+  plaidName?: string | null;
+  plaidMerchantName?: string | null;
+}): string | null {
+  const d = opts.plaidDescription?.trim();
+  if (d && !isGenericVenmoPayee(d)) return d;
+  for (const raw of [opts.plaidName, opts.plaidMerchantName]) {
+    if (!raw || isGenericVenmoPayee(raw)) continue;
+    const s = String(raw).trim();
+    const m = s.match(/^(.+?)\s+["“](.+?)["”]\s*$/);
+    if (m) return `${m[1].trim()} - ${m[2].trim()}`;
+    if (/\s-\s/.test(s) && !/^venmo\b/i.test(s)) return s;
+  }
+  return null;
+}
 
 /** Human payee; null → UI shows "—". */
 export function resolveDisplayPayee(input: DisplayPayeeInput): string | null {
@@ -132,19 +166,29 @@ export function resolveDisplayPayee(input: DisplayPayeeInput): string | null {
     payeeName,
     transferAccountName,
     plaidMerchantName,
+    plaidName,
+    plaidDescription,
     plaidPfc,
     importPayeeName: importRaw,
     accounts = [],
   } = input;
 
-  if (payeeName && String(payeeName).trim()) {
-    return String(payeeName).trim();
-  }
+  const named =
+    payeeName && String(payeeName).trim() ? String(payeeName).trim() : null;
+  const venmoLabel = venmoDescriptionLabel({
+    plaidDescription,
+    plaidName,
+    plaidMerchantName,
+  });
+  if (named && isGenericVenmoPayee(named) && venmoLabel) return venmoLabel;
+  if (named) return named;
   if (transferAccountName && String(transferAccountName).trim()) {
     return `Transfer : ${String(transferAccountName).trim()}`;
   }
 
   const importPayeeName = parseImportPayeeName(importRaw);
+  if (isGenericVenmoPayee(importPayeeName) && venmoLabel) return venmoLabel;
+
   const ending =
     extractCardEnding(plaidMerchantName) || extractCardEnding(importPayeeName);
 
@@ -162,6 +206,7 @@ export function resolveDisplayPayee(input: DisplayPayeeInput): string | null {
     return formatCreditPaymentPayee(ending, accounts);
   }
 
+  if (venmoLabel) return venmoLabel;
   const plaidClean = cleanPlaidMerchantName(plaidMerchantName);
   if (plaidClean) return plaidClean;
   if (importPayeeName) return importPayeeName;
@@ -181,6 +226,8 @@ export function resolveDisplayPayeeForTxn(
     payeeName: namedPayee ?? t.payeeName ?? null,
     transferAccountName: transfer?.name ?? null,
     plaidMerchantName: t.plaidMerchantName,
+    plaidName: t.plaidName,
+    plaidDescription: t.plaidDescription,
     plaidPfc: t.plaidPfc,
     importPayeeName: t.importPayeeName,
     accounts,

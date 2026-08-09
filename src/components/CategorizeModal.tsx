@@ -6,11 +6,14 @@ import { formatMoney } from '../lib/money';
 import { formatFriendlyDate } from '../lib/relativeDate';
 import {
   isAssignableCategory,
+  resolveAccountName,
   resolvePayee,
+  formatTxnStatus,
 } from '../lib/dataStore';
 import type { LedgerData } from '../lib/dataStore';
 import { mapsLinkForTxn } from '../lib/googleMaps';
 import { enqueueCategorize } from '../lib/pendingCategorize';
+import { venmoDescriptionLabel } from '../lib/displayPayee';
 
 export function CategorizeModal({
   data,
@@ -141,7 +144,24 @@ export function CategorizeModal({
               {bulk
                 ? `${targets.length} selected · net ${formatMoney(net)}`
                 : primary
-                  ? `${resolvePayee(data, primary)} · ${formatFriendlyDate(primary.date)} · ${formatMoney(primary.amount)}`
+                  ? (() => {
+                      const acct = data.accounts.find(
+                        (a) => a.ynabId === primary.accountId,
+                      );
+                      const desc = venmoDescriptionLabel({
+                        plaidDescription: primary.plaidDescription,
+                        plaidName: primary.plaidName,
+                        plaidMerchantName: primary.plaidMerchantName,
+                      });
+                      const dateSlash = String(primary.date || '')
+                        .trim()
+                        .replace(/-/g, '/');
+                      // Ruby BoA · 2026/06/16 · Needs approval - Person - note
+                      if (desc) {
+                        return `${resolveAccountName(acct)} · ${dateSlash} · ${formatTxnStatus(primary.approved !== false)} - ${desc}`;
+                      }
+                      return `${resolvePayee(data, primary)} · ${formatFriendlyDate(primary.date)} · ${formatMoney(primary.amount)}`;
+                    })()
                   : ''}
             </p>
             {!bulk &&

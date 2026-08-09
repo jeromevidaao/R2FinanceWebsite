@@ -585,13 +585,14 @@ export function resolvePayee(
   }
 
   const named = payeeId ? payeeMap(data).get(payeeId)?.name : null;
-  if (named) return named;
 
   if (txn) {
-    const display = resolveDisplayPayeeForTxn(txn, data.accounts, null);
+    // Prefer Venmo Personal note over bare "Venmo" / ACH payee names.
+    const display = resolveDisplayPayeeForTxn(txn, data.accounts, named);
     if (display) return display;
   }
 
+  if (named) return named;
   if (payeeId) return 'Unknown payee';
   return '—';
 }
