@@ -146,6 +146,10 @@ function looksLikeVenmoPersonalDesc(s: string): boolean {
   // Title Case person - note (not ALL-CAPS merchant - CITY)
   if (/^[A-Z][a-z]+(?:\s+[A-Z][a-z'.-]+)+\s-\s\S/.test(t)) return true;
   if (/standard\s+transfer/i.test(t)) return true;
+  // Bare Venmo notes ("Fire wood") — reject ALL-CAPS merchant labels
+  if (t.length <= 80 && /[a-z]/.test(t) && !/^[A-Z0-9\s#&.'/-]+$/.test(t)) {
+    return true;
+  }
   return false;
 }
 
