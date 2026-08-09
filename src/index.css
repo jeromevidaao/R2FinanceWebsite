@@ -512,20 +512,19 @@ select {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Spreadsheet table — fixed cols stay tight; payee absorbs leftover */
+/* Spreadsheet table — fixed cols stay tight; payee absorbs leftover.
+   Checkbox lives inside the Date column (no separate header). */
 .inbox-table {
   width: 100%;
-  min-width: 640px;
+  min-width: 600px;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.82rem;
   line-height: 1.25;
 }
-.inbox-table .inbox-col-check {
-  width: 2.25rem;
-}
 .inbox-table .inbox-col-date {
-  width: 6.75rem; /* YYYY/MM/DD + padding */
+  /* checkbox + gap + YYYY/MM/DD */
+  width: 8.5rem;
 }
 .inbox-table .inbox-col-payee {
   width: auto; /* absorbs remaining width */
@@ -560,15 +559,13 @@ select {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.inbox-table .inbox-th-check,
-.inbox-table .inbox-td-check {
-  padding-left: 10px;
-  padding-right: 2px;
-  width: 2.25rem;
+/* Date header aligns with the date text (past the checkbox width) */
+.inbox-table .inbox-th-date {
+  padding-left: 2rem; /* ~checkbox + gap so "Date" sits over the date values */
+  padding-right: 8px;
 }
-.inbox-table .inbox-th-date,
 .inbox-table .inbox-td-date {
-  padding-left: 4px;
+  padding-left: 8px;
   padding-right: 8px;
 }
 
@@ -640,13 +637,17 @@ select {
   font-size: 0.75em;
 }
 
-/* Checkbox flush left (after color rail), then tight date */
-.inbox-td-check {
+/* Checkbox + date on one line (checkbox has no column header) */
+.inbox-date-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
   white-space: nowrap;
-  vertical-align: middle;
 }
 .inbox-check {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   margin: 0;
@@ -661,8 +662,8 @@ select {
   cursor: pointer;
   margin: 0;
 }
-.inbox-td-date,
 .inbox-date-text {
+  flex: 0 0 auto;
   white-space: nowrap;
   font-weight: 600;
   font-size: 0.8rem;
@@ -740,19 +741,6 @@ select {
   text-decoration: underline;
 }
 
-/* Screen-reader only (table select column) */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 @media (max-width: 900px) {
   .inbox-table .inbox-col-account {
     width: 7.5rem;
@@ -767,10 +755,10 @@ select {
 
 @media (max-width: 720px) {
   .inbox-table {
-    min-width: 560px;
+    min-width: 520px;
   }
   .inbox-table .inbox-col-date {
-    width: 6.25rem;
+    width: 8rem;
   }
   .inbox-table .inbox-col-account {
     width: 6.5rem;

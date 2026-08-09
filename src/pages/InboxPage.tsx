@@ -265,7 +265,6 @@ export function InboxPage() {
         <div className="table-wrap panel inbox-panel">
           <table className="inbox-table">
             <colgroup>
-              <col className="inbox-col-check" />
               <col className="inbox-col-date" />
               <col className="inbox-col-payee" />
               <col className="inbox-col-account" />
@@ -274,9 +273,6 @@ export function InboxPage() {
             </colgroup>
             <thead>
               <tr>
-                <th scope="col" className="inbox-th-check">
-                  <span className="sr-only">Select</span>
-                </th>
                 <th scope="col" className="inbox-th-date">
                   Date
                 </th>
@@ -333,28 +329,30 @@ export function InboxPage() {
                         setDetailId(t.ynabId);
                       }}
                     >
-                      <td className="inbox-td-check">
-                        <label
-                          className="inbox-check"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSel}
-                            onChange={(e) =>
-                              onCheckboxChange(t.ynabId, e.target.checked)
-                            }
-                            onClick={(e) => onCheckboxClick(t.ynabId, e)}
-                            aria-label={
-                              isSel
-                                ? `Deselect ${payee}`
-                                : `Select ${payee}`
-                            }
-                          />
-                        </label>
-                      </td>
-                      <td className="inbox-td-date mono inbox-date-text">
-                        {formatInboxDate(t.date)}
+                      <td className="inbox-td-date">
+                        <div className="inbox-date-cell">
+                          <label
+                            className="inbox-check"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSel}
+                              onChange={(e) =>
+                                onCheckboxChange(t.ynabId, e.target.checked)
+                              }
+                              onClick={(e) => onCheckboxClick(t.ynabId, e)}
+                              aria-label={
+                                isSel
+                                  ? `Deselect ${payee}`
+                                  : `Select ${payee}`
+                              }
+                            />
+                          </label>
+                          <span className="mono inbox-date-text">
+                            {formatInboxDate(t.date)}
+                          </span>
+                        </div>
                       </td>
                       <td
                         className="inbox-td-payee"
