@@ -17,12 +17,12 @@ import {
   groupInboxByDate,
 } from '../lib/categoryDisplay';
 import {
-  formatTxnStatus,
   isInboxTxn,
   patchTransactionApproved,
   patchTransactionFields,
   resolveAccountName,
   resolvePayee,
+  formatTxnStatus,
 } from '../lib/dataStore';
 import type { Transaction } from '../api/types';
 import { mapsLinkForTxn } from '../lib/googleMaps';
@@ -270,7 +270,6 @@ export function InboxPage() {
               <col className="inbox-col-payee" />
               <col className="inbox-col-account" />
               <col className="inbox-col-category" />
-              <col className="inbox-col-status" />
               <col className="inbox-col-amount" />
             </colgroup>
             <thead>
@@ -284,8 +283,7 @@ export function InboxPage() {
                 <th scope="col">Payee</th>
                 <th scope="col">Account</th>
                 <th scope="col">Category</th>
-                <th scope="col">Status</th>
-                <th scope="col" className="num">
+                <th scope="col" className="num inbox-th-amount">
                   Amount
                 </th>
               </tr>
@@ -399,9 +397,6 @@ export function InboxPage() {
                       </td>
                       <td className="inbox-td-category">
                         <CategoryChip chip={row.chip} />
-                      </td>
-                      <td className="inbox-td-status muted">
-                        {formatTxnStatus(t.approved !== false)}
                       </td>
                       <td
                         className={`num mono inbox-td-amount ${moneyClass(t.amount)}`}

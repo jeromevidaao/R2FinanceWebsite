@@ -515,7 +515,7 @@ select {
 /* Spreadsheet table — fixed cols stay tight; payee absorbs leftover */
 .inbox-table {
   width: 100%;
-  min-width: 720px;
+  min-width: 640px;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.82rem;
@@ -534,13 +534,11 @@ select {
   width: 9.5rem;
 }
 .inbox-table .inbox-col-category {
-  width: 10.5rem;
+  width: 11rem;
 }
-.inbox-table .inbox-col-status {
-  width: 6.75rem; /* "Needs approval" */
-}
+/* Fits signed amounts like −$12,345.67 without clipping */
 .inbox-table .inbox-col-amount {
-  width: 6.5rem;
+  width: 7.75rem;
 }
 .inbox-table thead th {
   position: sticky;
@@ -612,6 +610,10 @@ select {
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   vertical-align: middle;
   overflow: hidden;
+}
+/* Amount must never clip (sign + currency + cents) */
+.inbox-tr > td.inbox-td-amount {
+  overflow: visible;
 }
 .inbox-tr:hover > td {
   background: rgba(255, 255, 255, 0.03);
@@ -710,14 +712,16 @@ select {
 .inbox-td-category .cat-chip-icon {
   font-size: 11px;
 }
-.inbox-td-status {
-  white-space: nowrap;
-  font-size: 0.75rem;
-}
+.inbox-th-amount,
 .inbox-td-amount {
   white-space: nowrap;
   font-weight: 650;
   font-size: 0.82rem;
+  /* Don't clip currency; parent td uses overflow:hidden */
+  overflow: visible;
+  text-overflow: clip;
+  padding-right: 12px;
+  min-width: 7.5rem;
 }
 
 .inbox-meta {
@@ -756,23 +760,26 @@ select {
   .inbox-table .inbox-col-category {
     width: 8.5rem;
   }
+  .inbox-table .inbox-col-amount {
+    width: 7.5rem;
+  }
 }
 
 @media (max-width: 720px) {
   .inbox-table {
-    min-width: 640px;
+    min-width: 560px;
   }
   .inbox-table .inbox-col-date {
     width: 6.25rem;
-  }
-  .inbox-table .inbox-col-status {
-    width: 4.5rem;
   }
   .inbox-table .inbox-col-account {
     width: 6.5rem;
   }
   .inbox-table .inbox-col-category {
     width: 7.5rem;
+  }
+  .inbox-table .inbox-col-amount {
+    width: 7.25rem;
   }
 }
 
