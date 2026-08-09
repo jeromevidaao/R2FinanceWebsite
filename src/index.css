@@ -559,24 +559,31 @@ select {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-/* Date header aligns with the date text (past the checkbox width) */
+/* Date header lines up with date text (past checkbox); leave room for rail */
 .inbox-table .inbox-th-date {
-  padding-left: 2rem; /* ~checkbox + gap so "Date" sits over the date values */
+  padding-left: 1.85rem; /* rail + checkbox + gap ≈ date text start */
   padding-right: 8px;
 }
 .inbox-table .inbox-td-date {
-  padding-left: 8px;
+  padding-left: 10px; /* room for 3px rail */
   padding-right: 8px;
 }
 
 /* Data rows — single-line dense (no day-section headers) */
 .inbox-tr {
-  position: relative;
   cursor: pointer;
   user-select: none;
 }
-/* Category color rail on the row (not each cell) */
-.inbox-tr::before {
+/*
+ * Color rail on the FIRST CELL, not tr::before.
+ * Pseudo-elements on <tr> become an extra anonymous table cell in Chromium,
+ * which shifted every body column one slot right of the headers
+ * (Payee showed dates, Account showed payees, Amount showed chips).
+ */
+.inbox-td-date {
+  position: relative;
+}
+.inbox-td-date::before {
   content: '';
   position: absolute;
   left: 0;
@@ -587,17 +594,17 @@ select {
   z-index: 1;
   pointer-events: none;
 }
-.inbox-tr.is-group-first::before {
+.inbox-tr.is-group-first .inbox-td-date::before {
   top: 2px;
   border-top-left-radius: 2px;
   border-top-right-radius: 2px;
 }
-.inbox-tr.is-group-last::before {
+.inbox-tr.is-group-last .inbox-td-date::before {
   bottom: 2px;
   border-bottom-left-radius: 2px;
   border-bottom-right-radius: 2px;
 }
-.inbox-tr.is-group-first.is-group-last::before {
+.inbox-tr.is-group-first.is-group-last .inbox-td-date::before {
   top: 3px;
   bottom: 3px;
   border-radius: 2px;
