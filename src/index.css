@@ -537,7 +537,7 @@ select {
   width: 10.5rem;
 }
 .inbox-table .inbox-col-status {
-  width: 5.25rem;
+  width: 6.75rem; /* "Needs approval" */
 }
 .inbox-table .inbox-col-amount {
   width: 6.5rem;
