@@ -512,32 +512,35 @@ select {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Spreadsheet table */
+/* Spreadsheet table — fixed cols stay tight; payee absorbs leftover */
 .inbox-table {
   width: 100%;
-  min-width: 780px;
+  min-width: 720px;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.82rem;
   line-height: 1.25;
 }
+.inbox-table .inbox-col-check {
+  width: 2.25rem;
+}
 .inbox-table .inbox-col-date {
-  width: 8.5rem;
+  width: 6.75rem; /* YYYY/MM/DD + padding */
 }
 .inbox-table .inbox-col-payee {
-  width: 28%;
+  width: auto; /* absorbs remaining width */
 }
 .inbox-table .inbox-col-account {
-  width: 14%;
+  width: 9.5rem;
 }
 .inbox-table .inbox-col-category {
-  width: 16%;
+  width: 10.5rem;
 }
 .inbox-table .inbox-col-status {
-  width: 6rem;
+  width: 5.25rem;
 }
 .inbox-table .inbox-col-amount {
-  width: 6.75rem;
+  width: 6.5rem;
 }
 .inbox-table thead th {
   position: sticky;
@@ -559,8 +562,16 @@ select {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.inbox-table .inbox-th-date {
-  padding-left: 8px;
+.inbox-table .inbox-th-check,
+.inbox-table .inbox-td-check {
+  padding-left: 10px;
+  padding-right: 2px;
+  width: 2.25rem;
+}
+.inbox-table .inbox-th-date,
+.inbox-table .inbox-td-date {
+  padding-left: 4px;
+  padding-right: 8px;
 }
 
 /* Data rows — single-line dense (no day-section headers) */
@@ -627,26 +638,19 @@ select {
   font-size: 0.75em;
 }
 
-/* Checkbox + date on one line */
-.inbox-td-date {
+/* Checkbox flush left (after color rail), then tight date */
+.inbox-td-check {
   white-space: nowrap;
-  padding-left: 8px !important;
-  padding-right: 6px !important;
-}
-.inbox-date-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
+  vertical-align: middle;
 }
 .inbox-check {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto;
   margin: 0;
   padding: 0;
   cursor: pointer;
+  line-height: 0;
 }
 .inbox-check input {
   width: 15px;
@@ -655,11 +659,12 @@ select {
   cursor: pointer;
   margin: 0;
 }
+.inbox-td-date,
 .inbox-date-text {
+  white-space: nowrap;
   font-weight: 600;
   font-size: 0.8rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
 
 .inbox-td-payee {
@@ -744,15 +749,30 @@ select {
   border: 0;
 }
 
+@media (max-width: 900px) {
+  .inbox-table .inbox-col-account {
+    width: 7.5rem;
+  }
+  .inbox-table .inbox-col-category {
+    width: 8.5rem;
+  }
+}
+
 @media (max-width: 720px) {
-  .inbox-date-iso {
-    display: none;
+  .inbox-table {
+    min-width: 640px;
   }
   .inbox-table .inbox-col-date {
-    width: 5rem;
+    width: 6.25rem;
   }
   .inbox-table .inbox-col-status {
     width: 4.5rem;
+  }
+  .inbox-table .inbox-col-account {
+    width: 6.5rem;
+  }
+  .inbox-table .inbox-col-category {
+    width: 7.5rem;
   }
 }
 
