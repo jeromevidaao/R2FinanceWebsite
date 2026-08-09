@@ -381,6 +381,25 @@ export function InboxPage() {
                       >
                         <span className="inbox-payee-line">
                           {payee}
+                          {t.amazonOrderUrl ? (
+                            <>
+                              {' '}
+                              <a
+                                className="amazon-order-link"
+                                href={t.amazonOrderUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                title={
+                                  t.amazonOrderNumber
+                                    ? `Amazon order ${t.amazonOrderNumber}`
+                                    : 'View Amazon order'
+                                }
+                              >
+                                Amazon order
+                              </a>
+                            </>
+                          ) : null}
                           {row.sisterEnd && (
                             <span className="sister-badge muted">
                               {' '}
@@ -582,6 +601,23 @@ function TxnDetailModal({
                 txn,
               )}
             </p>
+            {txn.amazonOrderUrl ? (
+              <p className="muted small inbox-meta">
+                <a
+                  className="amazon-order-link"
+                  href={txn.amazonOrderUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {txn.amazonOrderNumber
+                    ? `Amazon order ${txn.amazonOrderNumber}`
+                    : 'Amazon order'}
+                </a>
+                {txn.amazonItemsSummary
+                  ? ` · ${txn.amazonItemsSummary}`
+                  : null}
+              </p>
+            ) : null}
             {(() => {
               const maps = mapsLinkForTxn(txn, payee);
               const loc = txn.locationDisplay;

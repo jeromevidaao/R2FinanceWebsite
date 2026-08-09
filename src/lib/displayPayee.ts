@@ -139,6 +139,16 @@ export function isGenericVenmoPayee(text?: string | null): boolean {
   return false;
 }
 
+function looksLikeVenmoPersonalDesc(s: string): boolean {
+  const t = s.trim();
+  if (!t || isGenericVenmoPayee(t)) return false;
+  if (/^(.+?)\s+["“](.+?)["”]\s*$/.test(t)) return true;
+  // Title Case person - note (not ALL-CAPS merchant - CITY)
+  if (/^[A-Z][a-z]+(?:\s+[A-Z][a-z'.-]+)+\s-\s\S/.test(t)) return true;
+  if (/standard\s+transfer/i.test(t)) return true;
+  return false;
+}
+
 /**
  * Venmo Personal note for UI: "Person - note".
  * Only returns Venmo-style labels (quoted note or stamped "Name - note").
@@ -149,7 +159,7 @@ export function venmoDescriptionLabel(opts: {
   plaidMerchantName?: string | null;
 }): string | null {
   const d = opts.plaidDescription?.trim();
-  if (d && !isGenericVenmoPayee(d)) return d;
+  if (d && looksLikeVenmoPersonalDesc(d)) return d;
   for (const raw of [opts.plaidName, opts.plaidMerchantName]) {
     if (!raw || isGenericVenmoPayee(raw)) continue;
     const s = String(raw).trim();
@@ -213,6 +223,31 @@ export function resolveDisplayPayee(input: DisplayPayeeInput): string | null {
   return null;
 }
 
+/** Append Amazon item titles when the cloud matched an order. */
+export function enhanceAmazonDisplayPayee(
+  base: string | null | undefined,
+  t?: Pick<
+    Transaction,
+    'amazonItems' | 'amazonItemsSummary' | 'amazonOrderNumber'
+  > | null,
+): string | null {
+  if (!t) return base ?? null;
+  const summary =
+    (t.amazonItemsSummary && String(t.amazonItemsSummary).trim()) ||
+    (Array.isArray(t.amazonItems) && t.amazonItems.length
+      ? t.amazonItems
+          .map((x) => String(x || '').trim())
+          .filter(Boolean)
+          .slice(0, 3)
+          .join(', ')
+      : '');
+  if (!summary) return base ?? null;
+  const label = (base && String(base).trim()) || 'Amazon';
+  if (label.includes(summary)) return label;
+  if (/ — /.test(label) && /amazon/i.test(label)) return label;
+  return `${label} — ${summary}`;
+}
+
 /** Convenience: resolve from a Transaction + account list + optional named payee. */
 export function resolveDisplayPayeeForTxn(
   t: Transaction,
@@ -222,7 +257,7 @@ export function resolveDisplayPayeeForTxn(
   const transfer = t.transferAccountId
     ? accounts.find((a) => a.ynabId === t.transferAccountId)
     : null;
-  return resolveDisplayPayee({
+  const base = resolveDisplayPayee({
     payeeName: namedPayee ?? t.payeeName ?? null,
     transferAccountName: transfer?.name ?? null,
     plaidMerchantName: t.plaidMerchantName,
@@ -232,4 +267,5 @@ export function resolveDisplayPayeeForTxn(
     importPayeeName: t.importPayeeName,
     accounts,
   });
+  return enhanceAmazonDisplayPayee(base, t);
 }

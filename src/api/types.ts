@@ -116,6 +116,12 @@ export interface Transaction {
   /** UI: "City, ST" (US) or "City, Country" (intl). */
   locationDisplay?: string | null;
   enrichedAt?: string | null;
+  /** Amazon order enrichment (Chrome extension → DDB match). */
+  amazonOrderNumber?: string | null;
+  amazonOrderUrl?: string | null;
+  amazonItems?: string[] | null;
+  amazonItemsSummary?: string | null;
+  amazonMatchMethod?: string | null;
   /** Inbox-only extras */
   accountName?: string | null;
   payeeName?: string | null;
