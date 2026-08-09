@@ -267,9 +267,9 @@ export function InboxPage() {
             <colgroup>
               <col className="inbox-col-date" />
               <col className="inbox-col-payee" />
+              <col className="inbox-col-amount" />
               <col className="inbox-col-account" />
               <col className="inbox-col-category" />
-              <col className="inbox-col-amount" />
             </colgroup>
             <thead>
               <tr>
@@ -277,11 +277,11 @@ export function InboxPage() {
                   Date
                 </th>
                 <th scope="col">Payee</th>
-                <th scope="col">Account</th>
-                <th scope="col">Category</th>
                 <th scope="col" className="num inbox-th-amount">
                   Amount
                 </th>
+                <th scope="col">Account</th>
+                <th scope="col">Category</th>
               </tr>
             </thead>
             <tbody>
@@ -388,15 +388,6 @@ export function InboxPage() {
                         </span>
                       </td>
                       <td
-                        className="inbox-td-account muted"
-                        title={resolveAccountName(acct)}
-                      >
-                        {resolveAccountName(acct)}
-                      </td>
-                      <td className="inbox-td-category">
-                        <CategoryChip chip={row.chip} />
-                      </td>
-                      <td
                         className={`num mono inbox-td-amount ${moneyClass(t.amount)}`}
                       >
                         {formatMoney(
@@ -404,6 +395,15 @@ export function InboxPage() {
                           data.plan.currency || 'USD',
                           { sign: true },
                         )}
+                      </td>
+                      <td
+                        className="inbox-td-account muted"
+                        title={resolveAccountName(acct)}
+                      >
+                        {resolveAccountName(acct)}
+                      </td>
+                      <td className="inbox-td-category">
+                        <CategoryChip chip={row.chip} />
                       </td>
                     </tr>
                   );
