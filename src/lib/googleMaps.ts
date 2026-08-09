@@ -1,41 +1,37 @@
 /**
  * Google Maps deep links for categorize / approval context.
- * Prefer lat/lon pin when Plaid location has coordinates; else search by
- * payee + city so restaurant places open with useful results.
+ * Only when a place was resolved as text (locationDisplay / address / city).
+ * Never use raw lat/lon pins — search by payee + place name.
  */
 
 import type { Transaction, TransactionLocation } from '../api/types';
 
-const RESTAURANT_PFC_RE =
-  /FOOD|RESTAURANT|COFFEE|CAFE|BAR|DINING|FAST.?FOOD|TAKEOUT|BAKERY|BREWERY|PUB|NIGHTLIFE/i;
-
-/** True when Plaid personal finance category looks like food/restaurant. */
-export function isRestaurantPlace(plaidPfc?: string | null): boolean {
-  if (!plaidPfc) return false;
-  return RESTAURANT_PFC_RE.test(plaidPfc);
+/**
+ * True when we have a human place label (not merely coordinates).
+ */
+export function hasFoundPlace(
+  locationDisplay?: string | null,
+  location?: TransactionLocation | null,
+): boolean {
+  if (locationDisplay?.trim()) return true;
+  if (location?.text?.trim()) return true;
+  if (location?.address?.trim()) return true;
+  if (location?.city?.trim()) return true;
+  return false;
 }
 
 /**
- * Build a Google Maps URL for a merchant place, or null when nothing useful
- * to search (no coords, no payee, no location label).
+ * Build a Google Maps search URL from place text, or null when no place
+ * label is available (coordinates alone are not enough).
  */
 export function googleMapsUrl(opts: {
   payee?: string | null;
   locationDisplay?: string | null;
   location?: TransactionLocation | null;
 }): string | null {
-  const loc = opts.location;
-  const lat = loc?.lat;
-  const lon = loc?.lon;
-  if (
-    lat != null &&
-    lon != null &&
-    Number.isFinite(lat) &&
-    Number.isFinite(lon)
-  ) {
-    return `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
-  }
+  if (!hasFoundPlace(opts.locationDisplay, opts.location)) return null;
 
+  const loc = opts.location;
   const payee = opts.payee?.trim() || '';
   const text =
     loc?.text?.trim() ||
@@ -58,32 +54,23 @@ export function googleMapsUrl(opts: {
 }
 
 /**
- * When to surface a Maps link during categorization:
- * - any row with a place pin (locationDisplay / coords / address), or
- * - restaurant-like PFC with a resolvable payee name.
+ * Surface a Maps link only when enrich found a place label
+ * (locationDisplay / address / city). Coords-only and restaurant-name
+ * guesses without a place are suppressed.
  */
 export function mapsLinkForTxn(
   txn: Pick<
     Transaction,
-    'location' | 'locationDisplay' | 'plaidPfc' | 'plaidMerchantName'
+    'location' | 'locationDisplay' | 'plaidMerchantName'
   >,
   payee?: string | null,
 ): string | null {
-  const hasPlace =
-    !!txn.locationDisplay?.trim() ||
-    (txn.location?.lat != null && txn.location?.lon != null) ||
-    !!txn.location?.text?.trim() ||
-    !!txn.location?.address?.trim() ||
-    !!txn.location?.city?.trim();
+  if (!hasFoundPlace(txn.locationDisplay, txn.location)) return null;
 
   const name =
     payee?.trim() ||
     txn.plaidMerchantName?.trim() ||
     null;
-
-  if (!hasPlace && !(isRestaurantPlace(txn.plaidPfc) && name)) {
-    return null;
-  }
 
   return googleMapsUrl({
     payee: name,
