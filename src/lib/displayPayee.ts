@@ -227,12 +227,17 @@ export function resolveDisplayPayee(input: DisplayPayeeInput): string | null {
   return null;
 }
 
-/** Append Amazon item titles when the cloud matched an order. */
+/** Append Amazon item titles + delivery city/state when the cloud matched an order. */
 export function enhanceAmazonDisplayPayee(
   base: string | null | undefined,
   t?: Pick<
     Transaction,
-    'amazonItems' | 'amazonItemsSummary' | 'amazonOrderNumber'
+    | 'amazonItems'
+    | 'amazonItemsSummary'
+    | 'amazonOrderNumber'
+    | 'amazonShipCity'
+    | 'amazonShipState'
+    | 'amazonShipLocation'
   > | null,
 ): string | null {
   if (!t) return base ?? null;
@@ -245,11 +250,28 @@ export function enhanceAmazonDisplayPayee(
           .slice(0, 3)
           .join(', ')
       : '');
-  if (!summary) return base ?? null;
+  const loc =
+    (t.amazonShipLocation && String(t.amazonShipLocation).trim()) ||
+    (() => {
+      const c = t.amazonShipCity && String(t.amazonShipCity).trim();
+      const st = t.amazonShipState && String(t.amazonShipState).trim();
+      if (c && st) return `${c}, ${st}`;
+      return c || st || '';
+    })();
+  if (!summary && !loc) return base ?? null;
   const label = (base && String(base).trim()) || 'Amazon';
-  if (label.includes(summary)) return label;
-  if (/ — /.test(label) && /amazon/i.test(label)) return label;
-  return `${label} — ${summary}`;
+  const hasSummary = !!(summary && label.includes(summary));
+  const hasLoc = !!(loc && label.includes(loc));
+  if (hasSummary && (hasLoc || !loc)) return label;
+  if (hasLoc && !summary) return label;
+  // Already enhanced with items — append location only.
+  if (/ — /.test(label) && /amazon/i.test(label)) {
+    if (loc && !label.includes(loc)) return `${label} · ${loc}`;
+    return label;
+  }
+  if (summary && loc) return `${label} — ${summary} · ${loc}`;
+  if (summary) return `${label} — ${summary}`;
+  return `${label} · ${loc}`;
 }
 
 /** Convenience: resolve from a Transaction + account list + optional named payee. */

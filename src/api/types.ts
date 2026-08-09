@@ -121,6 +121,11 @@ export interface Transaction {
   amazonOrderUrl?: string | null;
   amazonItems?: string[] | null;
   amazonItemsSummary?: string | null;
+  /** Delivery city/state from Amazon order address. */
+  amazonShipCity?: string | null;
+  amazonShipState?: string | null;
+  /** Formatted "City, ST" for payee lines. */
+  amazonShipLocation?: string | null;
   amazonMatchMethod?: string | null;
   /** Inbox-only extras */
   accountName?: string | null;

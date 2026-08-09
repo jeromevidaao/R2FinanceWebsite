@@ -616,6 +616,13 @@ function TxnDetailModal({
                 {txn.amazonItemsSummary
                   ? ` · ${txn.amazonItemsSummary}`
                   : null}
+                {txn.amazonShipLocation
+                  ? ` · 📦 ${txn.amazonShipLocation}`
+                  : txn.amazonShipCity
+                    ? ` · 📦 ${[txn.amazonShipCity, txn.amazonShipState]
+                        .filter(Boolean)
+                        .join(', ')}`
+                    : null}
               </p>
             ) : null}
             {(() => {
