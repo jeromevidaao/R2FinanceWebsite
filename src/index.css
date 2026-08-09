@@ -515,17 +515,14 @@ select {
 /* Spreadsheet table */
 .inbox-table {
   width: 100%;
-  min-width: 820px;
+  min-width: 780px;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.82rem;
   line-height: 1.25;
 }
-.inbox-table .inbox-col-check {
-  width: 2.25rem;
-}
 .inbox-table .inbox-col-date {
-  width: 7.25rem;
+  width: 8.5rem;
 }
 .inbox-table .inbox-col-payee {
   width: 28%;
@@ -562,39 +559,11 @@ select {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.inbox-table .inbox-th-check {
-  padding-left: 6px;
-  padding-right: 2px;
+.inbox-table .inbox-th-date {
+  padding-left: 8px;
 }
 
-/* Thin day band between date groups */
-.inbox-day-row td {
-  padding: 0;
-  border-bottom: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.02);
-}
-.inbox-day-band {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  min-height: 28px;
-}
-.inbox-date-label {
-  font-weight: 650;
-  font-size: 0.78rem;
-  letter-spacing: 0.01em;
-  color: var(--primary);
-}
-.inbox-cat-select {
-  margin-left: auto;
-  font-size: 11px !important;
-  padding: 1px 6px !important;
-  opacity: 0.85;
-  line-height: 1.2 !important;
-}
-
-/* Data rows — single-line dense */
+/* Data rows — single-line dense (no day-section headers) */
 .inbox-tr {
   position: relative;
   cursor: pointer;
@@ -658,14 +627,23 @@ select {
   font-size: 0.75em;
 }
 
-.inbox-td-check {
+/* Checkbox + date on one line */
+.inbox-td-date {
+  white-space: nowrap;
   padding-left: 8px !important;
-  padding-right: 2px !important;
+  padding-right: 6px !important;
+}
+.inbox-date-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 .inbox-check {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   margin: 0;
   padding: 0;
   cursor: pointer;
@@ -677,22 +655,11 @@ select {
   cursor: pointer;
   margin: 0;
 }
-
-/* Date column: friendly label + ISO under it (still one compact cell) */
-.inbox-td-date {
-  white-space: nowrap;
-  line-height: 1.15;
-}
-.inbox-date-friendly {
-  display: block;
+.inbox-date-text {
   font-weight: 600;
   font-size: 0.8rem;
-}
-.inbox-date-iso {
-  display: block;
-  font-size: 0.68rem;
-  opacity: 0.85;
-  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .inbox-td-payee {
