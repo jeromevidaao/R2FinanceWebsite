@@ -11,7 +11,6 @@ import { CategoryChip } from '../components/CategoryChip';
 import { ErrorPanel, Loading } from '../components/Loading';
 import { useLedger } from '../hooks/useLedger';
 import { formatMoney, moneyClass } from '../lib/money';
-import { formatFriendlyDate } from '../lib/relativeDate';
 import { ledgerApi } from '../api/client';
 import {
   categoryChipForTxn,
@@ -27,6 +26,15 @@ import {
 } from '../lib/dataStore';
 import type { Transaction } from '../api/types';
 import { mapsLinkForTxn } from '../lib/googleMaps';
+
+/** Ledger dates as YYYY/MM/DD only (inbox list + detail). */
+function formatInboxDate(raw: string | null | undefined): string {
+  if (raw == null || !String(raw).trim()) return '';
+  const s = String(raw).trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (m) return `${m[1]}/${m[2]}/${m[3]}`;
+  return s.replace(/-/g, '/');
+}
 
 export function InboxPage() {
   const { data, loading, error, refresh } = useLedger();
@@ -343,11 +351,8 @@ export function InboxPage() {
                               }
                             />
                           </label>
-                          <span
-                            className="mono inbox-date-text"
-                            title={t.date}
-                          >
-                            {formatFriendlyDate(t.date)}
+                          <span className="mono inbox-date-text">
+                            {formatInboxDate(t.date)}
                           </span>
                         </div>
                       </td>
@@ -558,7 +563,7 @@ function TxnDetailModal({
           <div>
             <h2>Transaction</h2>
             <p className="muted">
-              {resolveAccountName(acct)} · {formatFriendlyDate(txn.date)} ·{' '}
+              {resolveAccountName(acct)} · {formatInboxDate(txn.date)} ·{' '}
               {formatTxnStatus(txn.approved !== false)}
             </p>
             {(() => {
