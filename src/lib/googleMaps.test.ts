@@ -8,9 +8,17 @@ import {
   hasFoundPlace,
   isCoordinateQuery,
   isPlaceLabel,
+  isStreetAddress,
+  placeNameRelated,
   googleMapsUrl,
   mapsLinkForTxn,
 } from './googleMaps.ts';
+
+function queryOf(url: string | null): string {
+  if (!url) return '';
+  const q = url.split('query=')[1] || '';
+  return decodeURIComponent(q);
+}
 
 describe('isCoordinateQuery', () => {
   it('detects bare lat/lon pairs', () => {
@@ -50,6 +58,19 @@ describe('hasFoundPlace', () => {
   });
 });
 
+describe('isStreetAddress / placeNameRelated', () => {
+  it('street when digits present', () => {
+    assert.equal(isStreetAddress('1023 4th Ave'), true);
+    assert.equal(isStreetAddress("Sister's cafe"), false);
+    assert.equal(isStreetAddress('47.6,-122.3'), false);
+  });
+  it('rejects mismatched POI names', () => {
+    assert.equal(placeNameRelated("Don's Cafe", "Sister's cafe"), false);
+    assert.equal(placeNameRelated("Don's Cafe", "Don's Cafe"), true);
+    assert.equal(placeNameRelated('Voyager Cafe', 'Voyager Coffee House'), true);
+  });
+});
+
 describe('googleMapsUrl / mapsLinkForTxn', () => {
   it('null without place', () => {
     assert.equal(googleMapsUrl({ payee: 'Cafe' }), null);
@@ -76,11 +97,50 @@ describe('googleMapsUrl / mapsLinkForTxn', () => {
     });
     assert.ok(url);
     assert.match(url!, /maps\/search\/\?api=1&query=/);
-    assert.match(url!, /Voyager/);
-    assert.match(url!, /Seattle/);
-    assert.equal(isCoordinateQuery(decodeURIComponent(url!.split('query=')[1] || '')), false);
-    // Must not be a bare lat,lon pin query
+    const q = queryOf(url);
+    assert.match(q, /Voyager/);
+    assert.match(q, /Seattle/);
+    assert.equal(isCoordinateQuery(q), false);
     assert.doesNotMatch(url!, /query=47\.6,-122\.3/);
+  });
+  it('drops mismatched geocoded POI name (Don\'s → Sister\'s)', () => {
+    const url = googleMapsUrl({
+      payee: "Don's Cafe",
+      locationDisplay: 'Bellevue, WA',
+      location: {
+        address: "Sister's cafe",
+        city: 'Bellevue',
+        region: 'WA',
+        postal_code: '98005',
+        country: 'US',
+        text: "Sister's cafe, Bellevue, WA, 98005, US",
+      },
+    });
+    assert.ok(url);
+    const q = queryOf(url);
+    assert.match(q, /Don/);
+    assert.match(q, /Bellevue/);
+    assert.doesNotMatch(q, /Sister/i);
+    // Must not be the old garbage concat
+    assert.doesNotMatch(q, /Don's Cafe Sister/i);
+  });
+  it('keeps real street address with payee + city', () => {
+    const url = googleMapsUrl({
+      payee: "Don's Cafe",
+      locationDisplay: 'Bellevue, WA',
+      location: {
+        address: '1023 4th Ave',
+        city: 'Bellevue',
+        region: 'WA',
+        postal_code: '98005',
+        country: 'US',
+      },
+    });
+    assert.ok(url);
+    const q = queryOf(url);
+    assert.match(q, /1023/);
+    assert.match(q, /Bellevue/);
+    assert.match(q, /Don/);
   });
   it('null for restaurant payee without place', () => {
     assert.equal(
