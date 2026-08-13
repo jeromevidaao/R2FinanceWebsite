@@ -285,21 +285,24 @@ export function buildSpendingReport(opts: {
       payeeId: string | null | undefined;
     };
 
-    // Prefer non-transfer split legs. Pure transfer split (all legs transfer +
-    // amounts equal parent) → attribute nothing. Orphan transfer-only legs that
-    // do not reconcile to the parent → use parent (stale/partial split data).
+    // Prefer non-transfer split legs **only when legs sum to parent** (YNAB
+    // invariant). Pure transfer (all legs transfer + sum equals parent) →
+    // attribute nothing. Stale/incomplete Room or partial sync legs that do
+    // not reconcile → use parent so Reflect is not undercounted.
     const transferSubs = hasSplits
       ? t.subtransactions!.filter((s) => !!s.transferAccountId)
       : [];
-    const transferLegsSum = transferSubs.reduce((s, x) => s + x.amount, 0);
+    const allLegsSum = hasSplits
+      ? t.subtransactions!.reduce((s, x) => s + x.amount, 0)
+      : 0;
+    const legsReconcile = hasSplits && allLegsSum === t.amount;
     const pureTransferSplit =
-      hasSplits &&
+      legsReconcile &&
       nonTransferSubs.length === 0 &&
-      transferSubs.length > 0 &&
-      transferLegsSum === t.amount;
+      transferSubs.length > 0;
     const lines: Line[] = pureTransferSplit
       ? []
-      : hasSplits && nonTransferSubs.some((s) => s.amount !== 0)
+      : legsReconcile && nonTransferSubs.some((s) => s.amount !== 0)
         ? nonTransferSubs.map((s) => ({
             amount: s.amount,
             categoryId: s.categoryId ?? t.categoryId,

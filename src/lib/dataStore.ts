@@ -390,13 +390,16 @@ export async function loadLedger(
       serverTxnTotal > 0 && localTxnTotal < Math.floor(serverTxnTotal * 0.85);
 
     const nextMeta: LedgerMeta = {
-      cursor: pack.cursor || pack.serverTime || now,
+      // Incomplete full → keep cursor at 0 so next open retries full (same as Android).
+      cursor: underfilled ? 0 : pack.cursor || pack.serverTime || now,
       lastFullAt:
         pack.mode === 'full' || fullDue
           ? underfilled
             ? 0
             : now
-          : lastFullAt || now,
+          : // Never seed lastFull from delta — that stranded sparse/inbox-only
+            // ledgers and undercounted Reflect Last 12 Months.
+            lastFullAt || 0,
       lastSyncedAt: now,
     };
     await persist(next, nextMeta);
