@@ -176,6 +176,34 @@ export function findSisterPairs(
   return findSisterPairsWith(items, TXN_ACCESSORS, dateWindowDays);
 }
 
+/**
+ * Transfers may be approved from Categorization only when they cancel
+ * (net $0) inside the selection — a sister pair (CC payment + transfer,
+ * or both transfer legs) or unpaired transfers that themselves sum to 0.
+ * Regular non-transfer spend is always approvable.
+ */
+export function canApproveInboxSelectionWith<T>(
+  items: T[],
+  acc: SisterTxnAccessors<T>,
+  isTransfer: (t: T) => boolean,
+  dateWindowDays = SISTER_DATE_WINDOW_DAYS,
+): boolean {
+  if (!items.some(isTransfer)) return true;
+  const unpairedTransfers = findSisterPairsWith(items, acc, dateWindowDays)
+    .unpaired
+    .filter(isTransfer);
+  const net = unpairedTransfers.reduce((s, t) => s + acc.amount(t), 0);
+  return net === 0;
+}
+
+export function canApproveInboxSelection(items: Transaction[]): boolean {
+  return canApproveInboxSelectionWith(
+    items,
+    TXN_ACCESSORS,
+    (t) => !!t.transferAccountId,
+  );
+}
+
 /** Flatten pairs as [a1,b1,a2,b2,…] for list display. */
 export function flattenSisterPairs<T>(pairs: SisterPair<T>[]): T[] {
   const out: T[] = [];

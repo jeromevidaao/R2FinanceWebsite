@@ -27,6 +27,7 @@ import {
 import type { Transaction } from '../api/types';
 import { mapsLinkForTxn } from '../lib/googleMaps';
 import { venmoDescriptionLabel } from '../lib/displayPayee';
+import { canApproveInboxSelection } from '../lib/sisterPairs';
 
 /** Ledger dates as YYYY/MM/DD only (inbox list + detail). */
 function formatInboxDate(raw: string | null | undefined): string {
@@ -175,6 +176,10 @@ export function InboxPage() {
 
   function approveSelected() {
     if (selectedTxns.length === 0 || busy) return;
+    if (!canApproveInboxSelection(selectedTxns)) {
+      setBanner('Transfers must net to $0 to approve');
+      return;
+    }
     const ids = selectedTxns.map((t) => t.ynabId);
     // Local remove first — stay on this list, no full ledger refresh.
     patchTransactionApproved(ids);
@@ -201,6 +206,7 @@ export function InboxPage() {
   if (!data) return <Loading />;
 
   const hasSelection = selectedLive.size > 0;
+  const canApproveSelected = canApproveInboxSelection(selectedTxns);
   const categorizeTxns =
     categorizeIds &&
     categorizeIds
@@ -235,7 +241,7 @@ export function InboxPage() {
             ) : (
               <>
                 Spreadsheet view · sister pairs merged · Shift+click range ·
-                approve works without a category
+                transfers need net $0 to approve
               </>
             )}
           </p>
@@ -459,12 +465,20 @@ export function InboxPage() {
                 sign: true,
               })}
             </span>
+            {!canApproveSelected && (
+              <span className="muted small">Transfers must net to $0</span>
+            )}
           </div>
           <div className="btn-row">
             <button
               type="button"
               className="btn btn-secondary"
-              disabled={busy}
+              disabled={busy || !canApproveSelected}
+              title={
+                canApproveSelected
+                  ? undefined
+                  : 'Transfers must net to $0 to approve'
+              }
               onClick={() => void approveSelected()}
             >
               Approve
@@ -698,6 +712,12 @@ function TxnDetailModal({
             />
           </label>
         </div>
+        {!txn.approved && !canApproveInboxSelection([txn]) && (
+          <p className="muted small">
+            Transfers must net to $0 — select the matching pair on the list
+            to approve.
+          </p>
+        )}
         {err && <div className="alert alert-error">{err}</div>}
         <div className="btn-row" style={{ marginTop: 14 }}>
           <button
@@ -722,7 +742,12 @@ function TxnDetailModal({
             <button
               type="button"
               className="btn btn-secondary"
-              disabled={busy}
+              disabled={busy || !canApproveInboxSelection([txn])}
+              title={
+                canApproveInboxSelection([txn])
+                  ? undefined
+                  : 'Transfers must net to $0 to approve — select the matching pair'
+              }
               onClick={() => void save(true)}
             >
               Approve
