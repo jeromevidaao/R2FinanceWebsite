@@ -203,6 +203,43 @@ export function CategorizeModal({
                   </p>
                 );
               })()}
+            {!bulk &&
+              primary &&
+              (primary.amazonOrderUrl || primary.amazonOrderNumber) && (
+                <p className="muted small inbox-meta">
+                  <span>
+                    {primary.amazonOrderNumber
+                      ? `Amazon order ${primary.amazonOrderNumber}`
+                      : 'Amazon order'}
+                    {primary.amazonItemsSummary
+                      ? ` · ${primary.amazonItemsSummary}`
+                      : ''}
+                    {primary.amazonShipLocation
+                      ? ` · 📦 ${primary.amazonShipLocation}`
+                      : primary.amazonShipCity
+                        ? ` · 📦 ${[primary.amazonShipCity, primary.amazonShipState]
+                            .filter(Boolean)
+                            .join(', ')}`
+                        : ''}
+                  </span>
+                  {' · '}
+                  <a
+                    className="amazon-order-link"
+                    href={
+                      primary.amazonOrderUrl ||
+                      `https://www.amazon.com/your-orders/order-details?orderID=${encodeURIComponent(
+                        String(primary.amazonOrderNumber),
+                      )}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    title="Open order in Amazon"
+                  >
+                    Open in Amazon
+                  </a>
+                </p>
+              )}
             {bulk &&
               (() => {
                 const withPlace = targets.filter(

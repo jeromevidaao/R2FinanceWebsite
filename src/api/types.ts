@@ -119,6 +119,8 @@ export interface Transaction {
   /** Amazon order enrichment (Chrome extension → DDB match). */
   amazonOrderNumber?: string | null;
   amazonOrderUrl?: string | null;
+  /** Shopping-app deep link (Android); web uses amazonOrderUrl. */
+  amazonOrderAppUrl?: string | null;
   amazonItems?: string[] | null;
   amazonItemsSummary?: string | null;
   /** Delivery city/state from Amazon order address. */
