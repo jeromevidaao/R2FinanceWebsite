@@ -23,4 +23,4 @@ jobs:
         with:
           name: dist
           path: dist
-          retention-days: 3
+          retention-days: 1

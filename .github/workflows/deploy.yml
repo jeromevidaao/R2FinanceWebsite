@@ -80,3 +80,96 @@ jobs:
             --output text)
           echo "Invalidation: $INV_ID"
           echo "Deployed $SHA → https://finance.i-liquid.be/"
+
+  cleanup-artifacts:
+    name: Delete older Actions artifacts
+    needs: deploy
+    if: success()
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Delete older artifacts
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          # Keep this run's artifacts, the triggering CI run's artifacts
+          # (workflow_run), and the newest artifact per name so in-flight
+          # deploys can still download. Delete everything else in this repo.
+          # Never fail the workflow: continue-on-error is set on job and step.
+          set +e
+          python3 << 'PY'
+          import json, os, subprocess, sys
+          from collections import defaultdict
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          keep_runs = {os.environ.get("GITHUB_RUN_ID", "")}
+          wr = (os.environ.get("WORKFLOW_RUN_ID") or "").strip()
+          if wr and wr.lower() not in ("", "null", "none"):
+              keep_runs.add(wr)
+          keep_runs.discard("")
+
+          proc = subprocess.run(
+              ["gh", "api", "--paginate",
+               f"/repos/{repo}/actions/artifacts?per_page=100",
+               "--jq", ".artifacts[]"],
+              capture_output=True, text=True,
+          )
+          if proc.returncode != 0:
+              print("WARN: failed to list artifacts:", proc.stderr.strip() or proc.stdout.strip())
+              sys.exit(0)
+
+          arts = []
+          for line in proc.stdout.splitlines():
+              line = line.strip()
+              if not line:
+                  continue
+              try:
+                  arts.append(json.loads(line))
+              except json.JSONDecodeError as e:
+                  print("WARN: skip unreadable artifact line:", e)
+          live = [a for a in arts if not a.get("expired")]
+          if not live:
+              print("No live artifacts to clean up.")
+              sys.exit(0)
+
+          newest = {}
+          for a in live:
+              name = a.get("name") or ""
+              prev = newest.get(name)
+              if prev is None or (a.get("created_at") or "") > (prev.get("created_at") or ""):
+                  newest[name] = a
+
+          keep_ids = {a["id"] for a in newest.values()}
+          for a in live:
+              run_id = str((a.get("workflow_run") or {}).get("id") or "")
+              if run_id in keep_runs:
+                  keep_ids.add(a["id"])
+
+          deleted = 0
+          freed = 0
+          failed = 0
+          for a in live:
+              if a["id"] in keep_ids:
+                  print(f"KEEP  {a.get('name')} id={a['id']} run={(a.get('workflow_run') or {}).get('id')} bytes={a.get('size_in_bytes') or 0}")
+                  continue
+              size = a.get("size_in_bytes") or 0
+              d = subprocess.run(
+                  ["gh", "api", "-X", "DELETE",
+                   f"/repos/{repo}/actions/artifacts/{a['id']}"],
+                  capture_output=True, text=True,
+              )
+              if d.returncode == 0:
+                  deleted += 1
+                  freed += size
+                  print(f"DELETE {a.get('name')} id={a['id']} bytes={size}")
+              else:
+                  failed += 1
+                  print(f"WARN: failed to delete {a.get('name')} id={a['id']}: {(d.stderr or d.stdout).strip()}")
+          print(f"Summary: deleted={deleted} failed={failed} freed_bytes={freed} kept={len(keep_ids)}")
+          sys.exit(0)
+          PY
